@@ -455,7 +455,7 @@ const CodeArena = () => {
             {toast.show && (
                 <div style={{
                     position: "fixed", top: "20px", right: "20px",
-                    background: "white", padding: "16px 24px", borderRadius: "12px",
+                    background: "var(--iq-surface)", padding: "16px 24px", borderRadius: "12px",
                     boxShadow: "0 10px 30px -5px rgba(0,0,0,0.15)",
                     borderLeft: `6px solid ${toast.type === "success" ? "#87C232" : "#ef4444"}`,
                     display: "flex", alignItems: "center", gap: "12px", zIndex: 9999,

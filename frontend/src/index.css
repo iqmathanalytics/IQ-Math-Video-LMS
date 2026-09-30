@@ -80,6 +80,51 @@ body {
 }
 
 .iq-page { background: var(--iq-bg); color: var(--iq-text); }
+.iq-page ::-webkit-scrollbar-track { background: var(--iq-bg); }
+.iq-page ::-webkit-scrollbar-thumb { background: var(--iq-faint); }
+
+/* Older admin screens use a slate palette. Map those classes onto the site theme. */
+.iq-admin-body .text-slate-900,
+.iq-admin-body .text-slate-800,
+.iq-admin-body .text-slate-700,
+.iq-admin-body .text-\[\#1e293b\],
+.iq-admin-body .text-\[\#0f172a\] { color: var(--iq-text); }
+.iq-admin-body .text-slate-600,
+.iq-admin-body .text-slate-500,
+.iq-admin-body .text-slate-400 { color: var(--iq-muted); }
+.iq-admin-body .bg-white,
+.iq-admin-body .bg-slate-50 { background-color: var(--iq-surface); }
+.iq-admin-body .bg-slate-100,
+.iq-admin-body .bg-slate-200 { background-color: var(--iq-inset); }
+.iq-admin-body .border-slate-100,
+.iq-admin-body .border-slate-200,
+.iq-admin-body .border-slate-300 { border-color: var(--iq-border); }
+.iq-admin-body .bg-\[\#F8FAFC\],
+.iq-admin-body .bg-\[\#f8fafc\] { background-color: var(--iq-surface); color: var(--iq-text); }
+.iq-admin-body .bg-\[\#005EB8\],
+.iq-admin-body .bg-\[\#005eb8\] { background-color: var(--iq-accent); color: var(--iq-accent-ink); }
+.iq-admin-body .text-\[\#005EB8\],
+.iq-admin-body .text-\[\#005eb8\] { color: var(--iq-link); }
+.iq-admin-body .text-\[\#1e293b\],
+.iq-admin-body .text-\[\#0f172a\] { color: var(--iq-text); }
+.iq-admin-body .text-\[\#64748b\],
+.iq-admin-body .text-\[\#94a3b8\] { color: var(--iq-muted); }
+.iq-admin-body .border-\[\#005EB8\],
+.iq-admin-body .border-\[\#005eb8\] { border-color: var(--iq-accent); }
+.iq-admin-body .border-\[\#cbd5e1\],
+.iq-admin-body .border-\[\#CBD5E1\] { border-color: var(--iq-border); }
+.iq-admin-body .hover\:bg-slate-50:hover,
+.iq-admin-body .hover\:bg-slate-100:hover,
+.iq-admin-body .hover\:bg-slate-200:hover { background-color: var(--iq-hover); }
+.iq-admin-body input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]),
+.iq-admin-body textarea,
+.iq-admin-body select {
+  background-color: var(--iq-surface);
+  color: var(--iq-text);
+  border-color: var(--iq-border);
+}
+.iq-admin-body input::placeholder,
+.iq-admin-body textarea::placeholder { color: var(--iq-faint); }
 .iq-surface { background: var(--iq-surface); }
 .iq-inset { background: var(--iq-inset); }
 .iq-header { background: var(--iq-header); }

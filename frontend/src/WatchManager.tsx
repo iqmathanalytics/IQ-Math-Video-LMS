@@ -60,30 +60,30 @@ const WatchManager = () => {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <h2 className="text-2xl font-bold text-slate-800">Watch</h2>
-      <p className="mt-2 text-sm text-slate-500">Add an IQNex link for a watch lesson. The video stays on IQNex.</p>
-      <form onSubmit={addLesson} className="mt-6 space-y-3 rounded-2xl border border-slate-200 bg-white p-5">
-        <label className="block text-sm font-medium text-slate-700">Lesson title
-          <input value={title} onChange={(event) => setTitle(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-3" placeholder="Introduction to the course" />
+      <h2 className="text-3xl font-semibold" style={{ fontFamily: '"Space Grotesk", Inter, sans-serif' }}>Watch</h2>
+      <p className="mt-2 text-sm iq-muted">Add an IQNex link for a watch lesson. The video stays on IQNex.</p>
+      <form onSubmit={addLesson} className="mt-6 space-y-3 rounded-2xl border iq-line iq-surface p-5">
+        <label className="block text-sm font-medium">Lesson title
+          <input value={title} onChange={(event) => setTitle(event.target.value)} className="mt-1 w-full rounded-xl border iq-line bg-transparent px-3 py-3" placeholder="Introduction to the course" />
         </label>
-        <label className="block text-sm font-medium text-slate-700">IQNex link
-          <input value={link} onChange={(event) => setLink(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-3" placeholder="https://" />
+        <label className="block text-sm font-medium">IQNex link
+          <input value={link} onChange={(event) => setLink(event.target.value)} className="mt-1 w-full rounded-xl border iq-line bg-transparent px-3 py-3" placeholder="https://" />
         </label>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        {message && <p className="text-sm text-green-700">{message}</p>}
-        <button disabled={busy} className="rounded-xl bg-[#005EB8] px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">{busy ? "Saving…" : "Add lesson"}</button>
+        {error && <p className="text-sm text-red-500">{error}</p>}
+        {message && <p className="text-sm iq-accent">{message}</p>}
+        <button disabled={busy} className="rounded-full iq-accent-bg px-4 py-3 text-sm font-semibold disabled:opacity-60">{busy ? "Saving…" : "Add lesson"}</button>
       </form>
       <ul className="mt-6 space-y-3">
         {lessons.map((lesson) => (
-          <li key={lesson.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+          <li key={lesson.id} className="flex items-center justify-between gap-3 rounded-2xl border iq-line iq-surface p-4">
             <div>
-              <p className="font-semibold text-slate-800">{lesson.title}</p>
-              <a className="text-sm text-[#005EB8]" href={`https://www.youtube.com/watch?v=${lesson.youtube_id}`} target="_blank" rel="noreferrer">Open on IQNex</a>
+              <p className="font-semibold">{lesson.title}</p>
+              <a className="text-sm iq-link" href={`https://www.youtube.com/watch?v=${lesson.youtube_id}`} target="_blank" rel="noreferrer">Open on IQNex</a>
             </div>
-            <button type="button" onClick={() => removeLesson(lesson.id)} className="rounded-lg border border-red-200 px-3 py-2 text-sm text-red-600">Remove</button>
+            <button type="button" onClick={() => removeLesson(lesson.id)} className="rounded-full border border-red-400/40 px-3 py-2 text-sm text-red-500">Remove</button>
           </li>
         ))}
-        {lessons.length === 0 && <li className="text-sm text-slate-500">No lessons yet.</li>}
+        {lessons.length === 0 && <li className="text-sm iq-muted">No lessons yet.</li>}
       </ul>
     </div>
   );

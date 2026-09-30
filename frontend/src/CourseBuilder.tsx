@@ -143,8 +143,9 @@ const CourseBuilder = () => {
     };
 
     const brand = {
-        blue: "#005EB8", green: "#87C232", bg: "#E2E8F0",
-        cardBg: "#F8FAFC", border: "#cbd5e1", textMain: "#1e293b", textLight: "#64748b"
+        blue: "var(--iq-accent)", green: "var(--iq-accent)", bg: "var(--iq-bg)",
+        cardBg: "var(--iq-surface)", border: "var(--iq-border)", textMain: "var(--iq-text)", textLight: "var(--iq-muted)",
+        onAccent: "var(--iq-accent-ink)",
     };
 
     const triggerToast = (message: string, type: "success" | "error" = "success") => {
@@ -816,7 +817,7 @@ const CourseBuilder = () => {
                                         key={c.id}
                                         onClick={() => handleEditChallenge(c)} // ✅ Click to Edit
                                         style={{
-                                            padding: "14px", background: "white", borderRadius: "10px", border: editingId === c.id ? `2px solid ${brand.blue}` : "1px solid #cbd5e1",
+                                            padding: "14px", background: "var(--iq-surface)", borderRadius: "10px", border: editingId === c.id ? `2px solid ${brand.blue}` : "1px solid #cbd5e1",
                                             fontSize: "14px", fontWeight: "600", color: brand.textMain, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", transition: "all 0.2s"
                                         }}
                                     >
@@ -1004,7 +1005,7 @@ const CourseBuilder = () => {
                                 <input autoFocus placeholder="Module Name..." value={newModuleTitle} onChange={(e) => setNewModuleTitle(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: `1px solid ${brand.border}`, marginBottom: "10px", outline: "none" }} />
                                 <div style={{ display: "flex", gap: "8px" }}>
                                     <button onClick={handleAddModule} style={{ flex: 1, background: brand.blue, color: "white", border: "none", padding: "10px", borderRadius: "8px", fontWeight: "700" }}>Add</button>
-                                    <button onClick={() => setShowAddModule(false)} style={{ flex: 1, background: "white", border: `1px solid ${brand.border}`, padding: "10px", borderRadius: "8px" }}>Cancel</button>
+                                    <button onClick={() => setShowAddModule(false)} style={{ flex: 1, background: "var(--iq-surface)", border: `1px solid ${brand.border}`, padding: "10px", borderRadius: "8px" }}>Cancel</button>
                                 </div>
                             </div>
                         ) : (
@@ -1128,7 +1129,7 @@ const CourseBuilder = () => {
                                                         left: 0,
                                                         right: 0,
                                                         zIndex: 1200,
-                                                        background: "white",
+                                                        background: "var(--iq-surface)",
                                                         border: `1px solid ${brand.border}`,
                                                         borderRadius: "10px",
                                                         boxShadow: "0 12px 30px rgba(15,23,42,0.12)",
@@ -1199,7 +1200,7 @@ const CourseBuilder = () => {
                                                         left: 0,
                                                         right: 0,
                                                         zIndex: 1200,
-                                                        background: "white",
+                                                        background: "var(--iq-surface)",
                                                         border: `1px solid ${brand.border}`,
                                                         borderRadius: "10px",
                                                         boxShadow: "0 12px 30px rgba(15,23,42,0.12)",
@@ -1275,7 +1276,7 @@ const CourseBuilder = () => {
                                     Target Module: <span style={{ color: brand.blue, fontWeight: 700 }}>{modules.find((m) => m.id === selectedModuleId)?.title || "Not selected"}</span>
                                 </div>
 
-                                <div style={{ overflowY: "auto", border: `1px solid ${brand.border}`, borderRadius: "12px", background: "white", flex: 1, minHeight: 0 }}>
+                                <div style={{ overflowY: "auto", border: `1px solid ${brand.border}`, borderRadius: "12px", background: "var(--iq-surface)", flex: 1, minHeight: 0 }}>
                                     {libraryLoading ? (
                                         <div style={{ padding: "30px", textAlign: "center", color: brand.textLight }}>Loading library...</div>
                                     ) : libraryItems.length === 0 ? (
@@ -1322,7 +1323,7 @@ const CourseBuilder = () => {
                                         <button
                                             type="button"
                                             onClick={() => setShowLibraryModal(false)}
-                                            style={{ padding: "10px 16px", borderRadius: "10px", border: `1px solid ${brand.border}`, background: "white", color: brand.textMain, fontWeight: 700, cursor: "pointer" }}
+                                            style={{ padding: "10px 16px", borderRadius: "10px", border: `1px solid ${brand.border}`, background: "var(--iq-surface)", color: brand.textMain, fontWeight: 700, cursor: "pointer" }}
                                         >
                                             Cancel
                                         </button>
@@ -1364,7 +1365,7 @@ const CourseBuilder = () => {
                                             </button>
                                             <ChevronDown size={16} style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", color: brand.textLight, pointerEvents: "none" }} />
                                             {isSourceCourseDropdownOpen && (
-                                                <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, zIndex: 1200, background: "white", border: `1px solid ${brand.border}`, borderRadius: "10px", boxShadow: "0 12px 30px rgba(15,23,42,0.12)", maxHeight: "240px", overflowY: "auto", padding: "6px" }}>
+                                                <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, zIndex: 1200, background: "var(--iq-surface)", border: `1px solid ${brand.border}`, borderRadius: "10px", boxShadow: "0 12px 30px rgba(15,23,42,0.12)", maxHeight: "240px", overflowY: "auto", padding: "6px" }}>
                                                     <button
                                                         type="button"
                                                         onClick={() => {
@@ -1407,7 +1408,7 @@ const CourseBuilder = () => {
                                     Target Course: <span style={{ color: brand.blue, fontWeight: 700 }}>{courseDetails?.title || `Course ${courseId}`}</span>
                                 </div>
 
-                                <div style={{ overflowY: "auto", border: `1px solid ${brand.border}`, borderRadius: "12px", background: "white", flex: 1, minHeight: 0 }}>
+                                <div style={{ overflowY: "auto", border: `1px solid ${brand.border}`, borderRadius: "12px", background: "var(--iq-surface)", flex: 1, minHeight: 0 }}>
                                     {modulesLoading ? (
                                         <div style={{ padding: "30px", textAlign: "center", color: brand.textLight }}>Loading modules...</div>
                                     ) : sourceModules.length === 0 ? (
@@ -1448,7 +1449,7 @@ const CourseBuilder = () => {
                                         <button
                                             type="button"
                                             onClick={() => setShowLibraryModal(false)}
-                                            style={{ padding: "10px 16px", borderRadius: "10px", border: `1px solid ${brand.border}`, background: "white", color: brand.textMain, fontWeight: 700, cursor: "pointer" }}
+                                            style={{ padding: "10px 16px", borderRadius: "10px", border: `1px solid ${brand.border}`, background: "var(--iq-surface)", color: brand.textMain, fontWeight: 700, cursor: "pointer" }}
                                         >
                                             Cancel
                                         </button>
@@ -1498,7 +1499,7 @@ const CourseBuilder = () => {
                                     <div>
                                         <label style={labelStyle}>Test Cases</label>
                                         {problems[activeProblemIndex].testCases.map((tc, idx) => (
-                                            <div key={idx} style={{ background: "white", padding: "10px", borderRadius: "8px", border: `1px solid ${brand.border}`, marginBottom: "8px" }}>
+                                            <div key={idx} style={{ background: "var(--iq-surface)", padding: "10px", borderRadius: "8px", border: `1px solid ${brand.border}`, marginBottom: "8px" }}>
                                                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "5px" }}>
                                                     <span style={{ fontSize: "11px", fontWeight: "700", color: brand.textLight }}>CASE {idx + 1}</span>
                                                     {problems[activeProblemIndex].testCases.length > 1 && <Trash2 size={14} color="#ef4444" cursor="pointer" onClick={() => removeTestCase(idx)} />}
@@ -1702,18 +1703,18 @@ const CourseBuilder = () => {
                     </div>
                 )
             }
-            {toast.show && (<div style={{ position: "fixed", top: "20px", right: "20px", zIndex: 9999, background: "white", padding: "16px 24px", borderRadius: "12px", boxShadow: "0 10px 30px -5px rgba(0,0,0,0.15)", borderLeft: `6px solid ${toast.type === "success" ? brand.green : "#ef4444"}`, display: "flex", alignItems: "center", gap: "12px", animation: "slideIn 0.3s ease-out" }}>{toast.type === "success" ? <CheckCircle size={24} color={brand.green} /> : <AlertCircle size={24} color="#ef4444" />}<div><h4 style={{ margin: "0 0 4px 0", fontSize: "14px", fontWeight: "700", color: brand.textMain }}>{toast.type === "success" ? "Success" : "Error"}</h4><p style={{ margin: 0, fontSize: "13px", color: brand.textLight }}>{toast.message}</p></div><button onClick={() => setToast({ ...toast, show: false })} style={{ background: "none", border: "none", cursor: "pointer", marginLeft: "10px" }}><X size={16} color="#94a3b8" /></button><style>{`@keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }`}</style></div>)}
+            {toast.show && (<div style={{ position: "fixed", top: "20px", right: "20px", zIndex: 9999, background: "var(--iq-surface)", padding: "16px 24px", borderRadius: "12px", boxShadow: "0 10px 30px -5px rgba(0,0,0,0.15)", borderLeft: `6px solid ${toast.type === "success" ? brand.green : "#ef4444"}`, display: "flex", alignItems: "center", gap: "12px", animation: "slideIn 0.3s ease-out" }}>{toast.type === "success" ? <CheckCircle size={24} color={brand.green} /> : <AlertCircle size={24} color="#ef4444" />}<div><h4 style={{ margin: "0 0 4px 0", fontSize: "14px", fontWeight: "700", color: brand.textMain }}>{toast.type === "success" ? "Success" : "Error"}</h4><p style={{ margin: 0, fontSize: "13px", color: brand.textLight }}>{toast.message}</p></div><button onClick={() => setToast({ ...toast, show: false })} style={{ background: "none", border: "none", cursor: "pointer", marginLeft: "10px" }}><X size={16} color="#94a3b8" /></button><style>{`@keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }`}</style></div>)}
         </div >
     );
 };
 
-const selectorCard = { display: "flex", alignItems: "center", gap: "20px", padding: "24px", background: "white", borderRadius: "16px", border: "1.5px solid #cbd5e1", cursor: "pointer", transition: "all 0.2s ease", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" };
-const cardTitle = { fontSize: "16px", fontWeight: "800", color: "#1e293b", marginBottom: "4px" };
-const cardDesc = { fontSize: "12px", color: "#64748b" };
-const modalOverlay = { position: "fixed" as const, top: 0, left: 0, right: 0, bottom: 0, background: "rgba(15, 23, 42, 0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "20px" };
-const modalContent = { background: "#F8FAFC", width: "100%", maxWidth: "600px", padding: "40px", borderRadius: "24px", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)" };
-const labelStyle = { display: "block", marginBottom: "8px", fontSize: "12px", fontWeight: "800", color: "#1e293b", textTransform: "uppercase" as const, letterSpacing: "0.5px" };
-const inputStyle = { width: "100%", padding: "14px", borderRadius: "12px", border: "1.5px solid #cbd5e1", fontSize: "15px", outline: "none", boxSizing: "border-box" as const, background: "white" };
-const saveButton = { width: "100%", padding: "16px", marginTop: "32px", background: "#005EB8", color: "white", border: "none", borderRadius: "14px", fontSize: "16px", fontWeight: "800", cursor: "pointer", boxShadow: "0 10px 15px -3px rgba(0, 94, 184, 0.3)" };
+const selectorCard = { display: "flex", alignItems: "center", gap: "20px", padding: "24px", background: "var(--iq-surface)", borderRadius: "16px", border: "1.5px solid var(--iq-border)", cursor: "pointer", transition: "all 0.2s ease" };
+const cardTitle = { fontSize: "16px", fontWeight: "800", color: "var(--iq-text)", marginBottom: "4px" };
+const cardDesc = { fontSize: "12px", color: "var(--iq-muted)" };
+const modalOverlay = { position: "fixed" as const, top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0, 0, 0, 0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "20px" };
+const modalContent = { background: "var(--iq-surface)", color: "var(--iq-text)", width: "100%", maxWidth: "600px", padding: "40px", borderRadius: "24px", border: "1px solid var(--iq-border)" };
+const labelStyle = { display: "block", marginBottom: "8px", fontSize: "12px", fontWeight: "800", color: "var(--iq-text)", textTransform: "uppercase" as const, letterSpacing: "0.5px" };
+const inputStyle = { width: "100%", padding: "14px", borderRadius: "12px", border: "1.5px solid var(--iq-border)", fontSize: "15px", outline: "none", boxSizing: "border-box" as const, background: "var(--iq-bg)", color: "var(--iq-text)" };
+const saveButton = { width: "100%", padding: "16px", marginTop: "32px", background: "var(--iq-accent)", color: "var(--iq-accent-ink)", border: "none", borderRadius: "14px", fontSize: "16px", fontWeight: "800", cursor: "pointer" };
 
 export default CourseBuilder;

@@ -36,26 +36,26 @@ const AdminHome = () => {
     : [];
 
   return (
-    <div className="space-y-6 text-slate-800">
+    <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-semibold">Overview</h2>
-        <p className="mt-1 max-w-2xl text-sm text-slate-600">Counts come from this account: your courses, the students on the site, public watch lessons, and certificates already issued.</p>
+        <h2 className="text-3xl font-semibold" style={{ fontFamily: '"Space Grotesk", Inter, sans-serif' }}>Overview</h2>
+        <p className="mt-1 max-w-2xl text-sm iq-muted">Counts come from this account: your courses, the students on the site, watch lessons, and certificates already issued.</p>
       </div>
-      {error && <p className="text-sm text-slate-600">{error}</p>}
-      {!stats && !error && <p className="text-sm text-slate-500">Loading…</p>}
+      {error && <p className="text-sm iq-muted">{error}</p>}
+      {!stats && !error && <p className="text-sm iq-muted">Loading…</p>}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {cards.map(([label, value, href]) => (
-          <Link key={String(label)} to={String(href)} className="rounded-2xl border border-slate-300 bg-white p-5">
-            <p className="text-sm text-slate-500">{label}</p>
+          <Link key={String(label)} to={String(href)} className="rounded-2xl border iq-line iq-surface p-5">
+            <p className="text-sm iq-muted">{label}</p>
             <p className="mt-2 text-3xl font-semibold tabular-nums">{value}</p>
           </Link>
         ))}
       </div>
-      <section className="rounded-2xl border border-slate-300 bg-white p-5">
+      <section className="rounded-2xl border iq-line iq-surface p-5">
         <h3 className="font-semibold">What students see</h3>
-        <ul className="mt-3 space-y-2 text-sm text-slate-600">
+        <ul className="mt-3 space-y-2 text-sm iq-muted">
           <li>Published courses appear in a student account after enrolment.</li>
-          <li>Watch lessons play on the public homepage and in My courses.</li>
+          <li>Watch lessons stay on IQNex. Students open their courses after they sign in.</li>
           <li>A certificate can be downloaded after the course assessments are submitted.</li>
         </ul>
       </section>

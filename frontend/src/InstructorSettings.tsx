@@ -18,13 +18,14 @@ const InstructorSettings = () => {
   };
 
   // 🎨 PROFESSIONAL THEME
-  const brand = { 
-    blue: "#005EB8", 
-    green: "#87C232",
-    cardBg: "#F8FAFC", 
-    border: "#cbd5e1",
-    textMain: "#1e293b",
-    textLight: "#64748b"
+  const brand = {
+    blue: "var(--iq-accent)",
+    green: "var(--iq-accent)",
+    cardBg: "var(--iq-surface)",
+    border: "var(--iq-border)",
+    textMain: "var(--iq-text)",
+    textLight: "var(--iq-muted)",
+    onAccent: "var(--iq-accent-ink)",
   };
 
   const handlePasswordChange = async (e: React.FormEvent) => {
@@ -73,10 +74,10 @@ const InstructorSettings = () => {
                         value={newPassword} 
                         onChange={(e) => setNewPassword(e.target.value)} 
                         placeholder="Enter new strong password" 
-                        style={{ width: "100%", padding: "14px", borderRadius: "10px", border: `1px solid ${brand.border}`, outline: "none", fontSize: "14px", boxSizing: "border-box", background: "white", color: brand.textMain }} 
+                        style={{ width: "100%", padding: "14px", borderRadius: "10px", border: `1px solid ${brand.border}`, outline: "none", fontSize: "14px", boxSizing: "border-box", background: "var(--iq-surface)", color: brand.textMain }} 
                     />
                 </div>
-                <button type="submit" disabled={saving} style={{ width: "100%", padding: "14px", background: brand.blue, color: "white", border: "none", borderRadius: "10px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", opacity: saving ? 0.7 : 1, boxShadow: "0 4px 12px rgba(0, 94, 184, 0.2)" }}>
+                <button type="submit" disabled={saving} style={{ width: "100%", padding: "14px", background: brand.blue, color: brand.onAccent, border: "none", borderRadius: "10px", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", opacity: saving ? 0.7 : 1 }}>
                     <Save size={18} /> {saving ? "Updating..." : "Update Password"}
                 </button>
             </form>
@@ -87,7 +88,7 @@ const InstructorSettings = () => {
         {toast.show && (
             <div style={{ 
                 position: "fixed", top: "20px", right: "20px", 
-                background: "white", padding: "16px 24px", borderRadius: "12px", 
+                background: "var(--iq-surface)", padding: "16px 24px", borderRadius: "12px", 
                 boxShadow: "0 10px 30px -5px rgba(0,0,0,0.15)", 
                 borderLeft: `6px solid ${toast.type === "success" ? brand.green : "#ef4444"}`,
                 display: "flex", alignItems: "center", gap: "12px", zIndex: 9999,

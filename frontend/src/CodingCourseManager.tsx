@@ -227,7 +227,7 @@ const CodingCourseManager = () => {
 
       {/* Toast Notification */}
       {toast.show && (
-        <div style={{ position: "fixed", top: "20px", right: "20px", background: "white", padding: "16px 24px", borderRadius: "12px", boxShadow: "0 10px 30px -5px rgba(0,0,0,0.15)", borderLeft: `6px solid ${toast.type === "success" ? "#87C232" : "#ef4444"}`, display: "flex", alignItems: "center", gap: "12px", zIndex: 9999, animation: "slideIn 0.3s ease-out" }}>
+        <div style={{ position: "fixed", top: "20px", right: "20px", background: "var(--iq-surface)", padding: "16px 24px", borderRadius: "12px", boxShadow: "0 10px 30px -5px rgba(0,0,0,0.15)", borderLeft: `6px solid ${toast.type === "success" ? "#87C232" : "#ef4444"}`, display: "flex", alignItems: "center", gap: "12px", zIndex: 9999, animation: "slideIn 0.3s ease-out" }}>
             {toast.type === "success" ? <CheckCircle size={24} color="#87C232" /> : <AlertTriangle size={24} color="#ef4444" />}
             <div><h4 style={{ margin: "0", fontSize: "14px", fontWeight: "700", color: "#1e293b" }}>{toast.type === "success" ? "Success" : "Error"}</h4><p style={{ margin: 0, fontSize: "13px", color: "#64748b" }}>{toast.message}</p></div>
             <button onClick={() => setToast({ ...toast, show: false })} style={{ background: "none", border: "none", cursor: "pointer", marginLeft: "10px", color: "#94a3b8" }}><X size={16} /></button>

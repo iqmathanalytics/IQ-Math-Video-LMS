@@ -53,12 +53,13 @@ const CoursePreview = () => {
 
   // 🎨 PROFESSIONAL THEME
   const brand = {
-    blue: "#005EB8",
-    green: "#87C232",
-    textMain: "#1e293b",
-    textLight: "#64748b",
-    cardBg: "#F8FAFC",
-    border: "#cbd5e1"
+    blue: "var(--iq-accent)",
+    green: "var(--iq-accent)",
+    textMain: "var(--iq-text)",
+    textLight: "var(--iq-muted)",
+    cardBg: "var(--iq-surface)",
+    border: "var(--iq-border)",
+    onAccent: "var(--iq-accent-ink)",
   };
 
   const triggerToast = (message: string, type: "success" | "error" = "success") => {
@@ -541,7 +542,7 @@ const CoursePreview = () => {
             )}
             <div style={{ display: "flex", gap: "10px" }}>
               <button onClick={handleEditItemSave} style={{ flex: 1, padding: "10px", background: brand.blue, color: "white", border: "none", borderRadius: "8px", fontWeight: "700", cursor: "pointer" }}>Save Changes</button>
-              <button onClick={() => setEditingItem(null)} style={{ flex: 1, padding: "10px", background: "white", color: brand.textLight, border: `1px solid ${brand.border}`, borderRadius: "8px", fontWeight: "700", cursor: "pointer" }}>Cancel</button>
+              <button onClick={() => setEditingItem(null)} style={{ flex: 1, padding: "10px", background: "var(--iq-surface)", color: brand.textLight, border: `1px solid ${brand.border}`, borderRadius: "8px", fontWeight: "700", cursor: "pointer" }}>Cancel</button>
             </div>
           </div>
         </div>
@@ -551,7 +552,7 @@ const CoursePreview = () => {
       {toast.show && (
         <div style={{
           position: "fixed", top: "20px", right: "20px", zIndex: 9999,
-          background: "white", padding: "16px 24px", borderRadius: "12px",
+          background: "var(--iq-surface)", padding: "16px 24px", borderRadius: "12px",
           boxShadow: "0 10px 30px -5px rgba(0,0,0,0.15)", borderLeft: `6px solid ${toast.type === "success" ? brand.green : "#ef4444"}`,
           display: "flex", alignItems: "center", gap: "12px", animation: "slideIn 0.3s ease-out"
         }}>

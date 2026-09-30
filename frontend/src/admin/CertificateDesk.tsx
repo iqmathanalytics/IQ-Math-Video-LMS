@@ -42,24 +42,24 @@ const CertificateDesk = () => {
   };
 
   return (
-    <div className="text-slate-800">
+    <div>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-semibold">Certificates</h2>
-          <p className="mt-1 max-w-2xl text-sm text-slate-600">Issued after a student submits the assessments. They download the PDF from their certificate section. This list is the record for your courses.</p>
+          <h2 className="text-3xl font-semibold" style={{ fontFamily: '"Space Grotesk", Inter, sans-serif' }}>Certificates</h2>
+          <p className="mt-1 max-w-2xl text-sm iq-muted">Issued after a student submits the assessments. They download the PDF from their certificate section. This list is the record for your courses.</p>
         </div>
-        <button type="button" onClick={exportCsv} disabled={shown.length === 0} className="rounded-full bg-[#005EB8] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Export CSV</button>
+        <button type="button" onClick={exportCsv} disabled={shown.length === 0} className="rounded-full iq-accent-bg px-4 py-2 text-sm font-semibold disabled:opacity-50">Export CSV</button>
       </div>
       <label className="mt-5 block max-w-sm text-sm">Search by student, course, or certificate number
-        <input value={query} onChange={(event) => setQuery(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-3" />
+        <input value={query} onChange={(event) => setQuery(event.target.value)} className="mt-1 w-full rounded-xl border iq-line iq-surface px-3 py-3" />
       </label>
-      {status === "loading" && <p className="mt-6 text-sm text-slate-500">Loading issued certificates…</p>}
-      {status === "error" && <p className="mt-6 text-sm text-slate-600">Certificates could not be loaded.</p>}
-      {status === "ready" && shown.length === 0 && <p className="mt-6 rounded-2xl border border-slate-300 bg-white p-5 text-sm text-slate-600">No certificates issued yet. They appear here when a student finishes the assessments and downloads one.</p>}
+      {status === "loading" && <p className="mt-6 text-sm iq-muted">Loading issued certificates…</p>}
+      {status === "error" && <p className="mt-6 text-sm iq-muted">Certificates could not be loaded.</p>}
+      {status === "ready" && shown.length === 0 && <p className="mt-6 rounded-2xl border iq-line iq-surface p-5 text-sm iq-muted">No certificates issued yet. They appear here when a student finishes the assessments and downloads one.</p>}
       {shown.length > 0 && (
-        <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-300 bg-white">
+        <div className="mt-4 overflow-x-auto rounded-2xl border iq-line iq-surface">
           <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-slate-200 text-slate-500">
+            <thead className="border-b iq-line iq-muted">
               <tr>
                 <th className="px-4 py-3 font-medium">Certificate</th>
                 <th className="px-4 py-3 font-medium">Student</th>
@@ -69,9 +69,9 @@ const CertificateDesk = () => {
             </thead>
             <tbody>
               {shown.map((row) => (
-                <tr key={row.id} className="border-b border-slate-100">
+                <tr key={row.id} className="border-b iq-line">
                   <td className="px-4 py-3 font-mono text-xs">{row.credential_id}</td>
-                  <td className="px-4 py-3">{row.student}<div className="text-xs text-slate-500">{row.email}</div></td>
+                  <td className="px-4 py-3">{row.student}<div className="text-xs iq-muted">{row.email}</div></td>
                   <td className="px-4 py-3">{row.course}</td>
                   <td className="px-4 py-3 tabular-nums">{row.issued_at}</td>
                 </tr>

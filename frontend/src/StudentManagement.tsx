@@ -36,13 +36,14 @@ const StudentManagement = () => {
 
   // 🎨 THEME
   const brand = {
-    blue: "#005EB8",
-    textMain: "#1e293b",
-    textLight: "#64748b",
-    cardBg: "#F8FAFC",
-    border: "#cbd5e1",
+    blue: "var(--iq-accent)",
+    textMain: "var(--iq-text)",
+    textLight: "var(--iq-muted)",
+    cardBg: "var(--iq-surface)",
+    border: "var(--iq-border)",
     danger: "#ef4444",
-    green: "#87C232" // Added green for success toast
+    green: "var(--iq-accent)",
+    onAccent: "var(--iq-accent-ink)",
   };
 
   useEffect(() => {
@@ -152,10 +153,10 @@ const StudentManagement = () => {
                 <tr><td colSpan={5} style={{ padding: "40px", textAlign: "center", color: brand.textLight }}>No students found.</td></tr>
               ) : (
                 filteredStudents.map(student => (
-                  <tr key={student.id} style={{ borderBottom: `1px solid ${brand.border}`, background: "white", transition: "background 0.2s" }} onMouseOver={(e) => e.currentTarget.style.background = "#f8fafc"} onMouseOut={(e) => e.currentTarget.style.background = "white"}>
+                  <tr key={student.id} style={{ borderBottom: `1px solid ${brand.border}`, background: "var(--iq-surface)", transition: "background 0.2s" }} onMouseOver={(e) => e.currentTarget.style.background = "var(--iq-hover)"} onMouseOut={(e) => e.currentTarget.style.background = "var(--iq-surface)"}>
                     <td style={{ padding: "20px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                        <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "#e0f2fe", color: brand.blue, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "var(--iq-inset)", color: brand.blue, display: "flex", alignItems: "center", justifyContent: "center" }}>
                           <User size={18} />
                         </div>
                         <div>
@@ -176,7 +177,7 @@ const StudentManagement = () => {
                         <span style={{ color: brand.textLight, fontSize: "18px", letterSpacing: "2px", lineHeight: "0" }}>••••••</span>
                         <button
                           onClick={() => setResetModal({ id: student.id, name: student.full_name })}
-                          style={{ padding: "6px", background: "#f0f9ff", color: brand.blue, border: `1px solid ${brand.border}`, borderRadius: "6px", cursor: "pointer" }}
+                          style={{ padding: "6px", background: "var(--iq-inset)", color: brand.blue, border: `1px solid ${brand.border}`, borderRadius: "6px", cursor: "pointer" }}
                           title="Reset Password"
                         >
                           <RefreshCw size={14} />
@@ -187,7 +188,7 @@ const StudentManagement = () => {
                     <td style={{ padding: "20px" }}>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                         {student.enrolled_courses.length > 0 ? student.enrolled_courses.map((c, i) => (
-                          <span key={i} style={{ fontSize: "11px", background: "#f1f5f9", padding: "4px 8px", borderRadius: "4px", color: brand.textMain, border: `1px solid ${brand.border}` }}>
+                          <span key={i} style={{ fontSize: "11px", background: "var(--iq-inset)", padding: "4px 8px", borderRadius: "4px", color: brand.textMain, border: `1px solid ${brand.border}` }}>
                             {c}
                           </span>
                         )) : <span style={{ fontSize: "12px", color: brand.textLight, fontStyle: "italic" }}>Not enrolled</span>}
@@ -196,7 +197,7 @@ const StudentManagement = () => {
                     <td style={{ padding: "20px", textAlign: "right" }}>
                       <button
                         onClick={() => setStudentToDelete(student)}
-                        style={{ padding: "8px", background: "#fef2f2", color: brand.danger, border: "1px solid #fee2e2", borderRadius: "8px", cursor: "pointer", transition: "all 0.2s" }}
+                        style={{ padding: "8px", background: "rgba(239, 68, 68, 0.12)", color: brand.danger, border: "1px solid rgba(239, 68, 68, 0.35)", borderRadius: "8px", cursor: "pointer", transition: "all 0.2s" }}
                         title="Remove Student"
                       >
                         <Trash2 size={16} />
@@ -215,7 +216,7 @@ const StudentManagement = () => {
       {
         studentToDelete && (
           <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(15, 23, 42, 0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, backdropFilter: "blur(2px)" }}>
-            <div style={{ background: "white", padding: "30px", borderRadius: "16px", width: "400px", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)", textAlign: "center" }}>
+            <div style={{ background: "var(--iq-surface)", padding: "30px", borderRadius: "16px", width: "400px", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)", textAlign: "center" }}>
               <div style={{ width: "50px", height: "50px", background: "#fef2f2", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px auto" }}>
                 <AlertCircle size={28} color={brand.danger} />
               </div>
@@ -224,7 +225,7 @@ const StudentManagement = () => {
                 Are you sure you want to remove <strong>{studentToDelete.full_name}</strong>? This action cannot be undone.
               </p>
               <div style={{ display: "flex", gap: "12px" }}>
-                <button onClick={() => setStudentToDelete(null)} style={{ flex: 1, padding: "12px", background: "white", border: `1px solid ${brand.border}`, borderRadius: "8px", fontWeight: "700", color: brand.textLight, cursor: "pointer" }}>Cancel</button>
+                <button onClick={() => setStudentToDelete(null)} style={{ flex: 1, padding: "12px", background: "var(--iq-surface)", border: `1px solid ${brand.border}`, borderRadius: "8px", fontWeight: "700", color: brand.textLight, cursor: "pointer" }}>Cancel</button>
                 <button onClick={handleDelete} style={{ flex: 1, padding: "12px", background: brand.danger, border: "none", borderRadius: "8px", fontWeight: "700", color: "white", cursor: "pointer" }}>Yes, Remove</button>
               </div>
             </div>
@@ -236,7 +237,7 @@ const StudentManagement = () => {
       {
         resetModal && (
           <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(15, 23, 42, 0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, backdropFilter: "blur(2px)" }}>
-            <div style={{ background: "white", padding: "30px", borderRadius: "16px", width: "400px", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)", textAlign: "center" }}>
+            <div style={{ background: "var(--iq-surface)", padding: "30px", borderRadius: "16px", width: "400px", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)", textAlign: "center" }}>
               <div style={{ width: "50px", height: "50px", background: "#f0f9ff", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px auto" }}>
                 <Key size={24} color={brand.blue} />
               </div>
@@ -254,8 +255,8 @@ const StudentManagement = () => {
               />
 
               <div style={{ display: "flex", gap: "12px" }}>
-                <button onClick={() => { setResetModal(null); setNewPass(""); }} style={{ flex: 1, padding: "12px", background: "white", border: `1px solid ${brand.border}`, borderRadius: "8px", fontWeight: "700", color: brand.textLight, cursor: "pointer" }}>Cancel</button>
-                <button onClick={handleResetPassword} disabled={!newPass} style={{ flex: 1, padding: "12px", background: brand.blue, border: "none", borderRadius: "8px", fontWeight: "700", color: "white", cursor: "pointer", opacity: newPass ? 1 : 0.7 }}>Update</button>
+                <button onClick={() => { setResetModal(null); setNewPass(""); }} style={{ flex: 1, padding: "12px", background: "var(--iq-surface)", border: `1px solid ${brand.border}`, borderRadius: "8px", fontWeight: "700", color: brand.textLight, cursor: "pointer" }}>Cancel</button>
+                <button onClick={handleResetPassword} disabled={!newPass} style={{ flex: 1, padding: "12px", background: brand.blue, border: "none", borderRadius: "8px", fontWeight: "700", color: brand.onAccent, cursor: "pointer", opacity: newPass ? 1 : 0.7 }}>Update</button>
               </div>
             </div>
           </div>
@@ -267,7 +268,7 @@ const StudentManagement = () => {
         toast.show && (
           <div style={{
             position: "fixed", top: "20px", right: "20px",
-            background: "white", padding: "16px 24px", borderRadius: "12px",
+            background: "var(--iq-surface)", padding: "16px 24px", borderRadius: "12px",
             boxShadow: "0 10px 30px -5px rgba(0,0,0,0.15)",
             borderLeft: `6px solid ${toast.type === "success" ? brand.green : "#ef4444"}`,
             display: "flex", alignItems: "center", gap: "12px", zIndex: 9999,
