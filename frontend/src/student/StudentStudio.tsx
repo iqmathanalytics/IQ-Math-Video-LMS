@@ -72,9 +72,6 @@ const Shell = () => {
             <NavLink to="/home" className={({ isActive }) => `${item} ${isActive ? active : ""}`}>Home</NavLink>
             <NavLink to="/courses" className={({ isActive }) => `${item} ${isActive ? active : ""}`}>Courses</NavLink>
             <NavLink to="/my-courses" className={({ isActive }) => `${item} ${isActive ? active : ""}`}>My learning</NavLink>
-            <NavLink to="/events" className={({ isActive }) => `${item} ${isActive ? active : ""}`}>Events</NavLink>
-            <NavLink to="/hackathons" className={({ isActive }) => `${item} ${isActive ? active : ""}`}>Hackathons</NavLink>
-            <NavLink to="/competitions" className={({ isActive }) => `${item} ${isActive ? active : ""}`}>Competitions</NavLink>
             <NavLink to="/certificates" className={({ isActive }) => `${item} ${isActive ? active : ""}`}>Certificates</NavLink>
             <NavLink to="/profile" className={({ isActive }) => `${item} ${isActive ? active : ""}`}>Profile</NavLink>
           </nav>
@@ -87,7 +84,6 @@ const Shell = () => {
         <NavLink to="/home" className={({ isActive }) => `px-2 py-2 ${isActive ? "iq-accent" : "iq-muted"}`}>Home</NavLink>
         <NavLink to="/courses" className={({ isActive }) => `px-2 py-2 ${isActive ? "iq-accent" : "iq-muted"}`}>Courses</NavLink>
         <NavLink to="/my-courses" className={({ isActive }) => `px-2 py-2 ${isActive ? "iq-accent" : "iq-muted"}`}>Learning</NavLink>
-        <NavLink to="/events" className={({ isActive }) => `px-2 py-2 ${isActive ? "iq-accent" : "iq-muted"}`}>Events</NavLink>
         <NavLink to="/profile" className={({ isActive }) => `px-2 py-2 ${isActive ? "iq-accent" : "iq-muted"}`}>Profile</NavLink>
       </nav>
     </div>
@@ -100,10 +96,11 @@ const loadCourses = async (): Promise<CourseCard[]> => {
     axios.get(`${API_BASE_URL}/my-courses`, { headers }).catch(() => ({ data: [] })),
     axios.get(`${API_BASE_URL}/watch`).catch(() => ({ data: [] })),
   ]);
-  const enrolled: CourseCard[] = (Array.isArray(mine.data) ? mine.data : []).map((course: { id: number; title: string; description: string; has_certificate?: boolean }) => ({
+  const enrolled: CourseCard[] = (Array.isArray(mine.data) ? mine.data : []).map((course: { id: number; title: string; description: string; has_certificate?: boolean; image_url?: string | null }) => ({
     id: String(course.id),
     title: course.title,
     description: course.description || "Lessons, practice, and a certificate when you finish.",
+    image_url: course.image_url,
     has_certificate: course.has_certificate,
   }));
   const demos = Array.isArray(watch.data) ? watch.data : [];
@@ -112,7 +109,7 @@ const loadCourses = async (): Promise<CourseCard[]> => {
     enrolled.unshift({
       id: "demos",
       title: "Demo lessons",
-      description: "YouTube lessons added by your instructor. They play here, and the creator stays on the player.",
+      description: "IQNex lessons added by your instructor. They play here, and the creator stays on the player.",
       demo: true,
       lessonCount: demos.length,
       doneCount: demos.filter((lesson: { id: number }) => done.has(String(lesson.id))).length,
@@ -173,13 +170,14 @@ const MyCourses = () => {
       </label>
       {status === "loading" && <p className="mt-8 text-sm iq-muted">Loading your courses…</p>}
       {status === "error" && <p className="mt-8 text-sm iq-muted">Courses could not be loaded. Check your connection and refresh.</p>}
-      {status === "ready" && shown.length === 0 && <p className="mt-8 rounded-2xl border iq-line p-6 text-sm iq-muted">No courses yet. Demo lessons appear here after an instructor adds a YouTube link.</p>}
+      {status === "ready" && shown.length === 0 && <p className="mt-8 rounded-2xl border iq-line p-6 text-sm iq-muted">No courses yet. Demo lessons appear here after an instructor adds an IQNex link.</p>}
       <ul className="mt-6 grid gap-4 md:grid-cols-2">
         {shown.map((course) => (
           <li key={course.id}>
             <div className="rounded-2xl border iq-line iq-surface p-5">
               <Link to={`/my-courses/${course.id}`} className="block">
-                <p className="text-xs uppercase tracking-[0.14em] iq-faint">{course.demo ? "Watch" : course.has_certificate ? "Certificate earned" : "In progress"}</p>
+                <CourseCover title={course.title} imageUrl={course.image_url} />
+                <p className="mt-3 text-xs uppercase tracking-[0.14em] iq-faint">{course.demo ? "Watch" : course.has_certificate ? "Certificate earned" : "In progress"}</p>
                 <h2 className="mt-2 text-xl font-semibold">{course.title}</h2>
                 <CourseFacts description={course.description} />
                 {course.lessonCount != null && <p className="mt-3 text-sm tabular-nums">{course.doneCount}/{course.lessonCount} lessons done</p>}
@@ -384,7 +382,7 @@ const LearnPage = () => {
               <div className="rounded-2xl border iq-line p-6 text-sm iq-muted">{lesson.instructions || lesson.url || "This lesson has no embedded video."}</div>
             )}
             <h1 className="mt-4 text-2xl font-semibold">{lesson.title}</h1>
-            {videoId && <p className="mt-1 text-sm iq-muted">Playing on YouTube. <a className="iq-link" href={`https://www.youtube.com/watch?v=${videoId}`} target="_blank" rel="noreferrer">Watch on YouTube</a></p>}
+            {videoId && <p className="mt-1 text-sm iq-muted">Playing on IQNex. <a className="iq-link" href={`https://www.youtube.com/watch?v=${videoId}`} target="_blank" rel="noreferrer">Watch on IQNex</a></p>}
             <div className="mt-4 flex flex-wrap gap-2 text-sm">
               {previous && <Link className="rounded-full border iq-line px-3 py-2" to={`/learn/${courseId}/${previous.id}`}>Previous</Link>}
               {next && <Link className="rounded-full border iq-line px-3 py-2" to={`/learn/${courseId}/${next.id}`}>Next</Link>}

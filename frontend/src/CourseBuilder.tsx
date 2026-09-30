@@ -1030,11 +1030,11 @@ const CourseBuilder = () => {
                         {[
                             { type: "Add from Library", icon: <BookOpen size={28} color={brand.blue} />, desc: "Reuse existing items" },
                             { type: "Note", icon: <Edit3 size={28} color={brand.blue} />, desc: "Drive PDF Links" },
-                            { type: "Video", icon: <Video size={28} color={brand.blue} />, desc: "YouTube lessons" },
+                            { type: "Video", icon: <Video size={28} color={brand.blue} />, desc: "IQNex lessons" },
                             { type: "Quiz", icon: <HelpCircle size={28} color={brand.blue} />, desc: "Google Form Links" },
                             { type: "Code Test", icon: <Code size={28} color="#7c3aed" />, desc: "Compiler Challenges" },
                             { type: "Assignment", icon: <FileText size={28} color={brand.blue} />, desc: "PDF projects (Drive)" },
-                            { type: "Live Class", icon: <Radio size={28} color="#ef4444" />, desc: "YouTube Live Link" },
+                            { type: "Live Class", icon: <Radio size={28} color="#ef4444" />, desc: "IQNex live link" },
                             { type: "Live Test", icon: <Zap size={28} color="#EAB308" />, desc: "Timed assessment" },
                         ].map(item => (
                             <div key={item.type} onClick={() => item.type === "Add from Library" ? openLibraryModal() : setActiveModal(item.type)} style={selectorCard}>
@@ -1523,7 +1523,7 @@ const CourseBuilder = () => {
                                             <label style={labelStyle}>
                                                 {activeModal === "Assignment" ? "Submission Drive Link (Google Form/Folder)"
                                                     : activeModal === "Note" ? "Google Drive PDF Link"
-                                                        : "YouTube / Google Form / App Script Link"}
+                                                        : "IQNex / Google Form / App Script Link"}
                                             </label><div style={{ position: "relative" }}><Link size={18} style={{ position: "absolute", left: "14px", top: "14px", color: brand.textLight }} /><input value={itemUrl} onChange={(e) => setItemUrl(e.target.value)} placeholder="https://..." style={{ ...inputStyle, paddingLeft: "45px" }} /></div></div>
                                         {activeModal === "Video" && (
                                             <div>

@@ -1,15 +1,9 @@
 import { FormEvent, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import PublicShell from "./PublicShell";
-import { COURSES, EVENTS, PATHS, type Topic } from "./catalog";
+import { COURSES, PATHS, type Topic } from "./catalog";
 
 const wrap = "mx-auto max-w-6xl px-4 py-14";
-
-const Countdown = ({ when }: { when: string }) => {
-  const target = new Date(when).getTime();
-  const days = Math.max(0, Math.ceil((target - Date.now()) / 86400000));
-  return <span className="font-mono text-xs iq-accent">{days} days out</span>;
-};
 
 export const CoursesPage = () => {
   const [topic, setTopic] = useState<Topic | "All">("All");
@@ -24,7 +18,7 @@ export const CoursesPage = () => {
     <PublicShell title="Courses">
       <div className={wrap}>
         <h1 className="text-4xl font-semibold" style={{ fontFamily: '"Space Grotesk", Inter, sans-serif' }}>Courses</h1>
-        <p className="mt-3 max-w-2xl iq-muted">Curated lessons from public YouTube channels. Playback stays on YouTube. Sign in to track progress in the learner app.</p>
+        <p className="mt-3 max-w-2xl iq-muted">Curated lessons on IQNex. Sign in to track progress in the learner app.</p>
         <div className="mt-8 flex flex-wrap gap-2">
           {(["All", "AI", "Web", "Cloud", "Data", "DevOps", "Career"] as const).map((item) => (
             <button key={item} onClick={() => setTopic(item)} className={`rounded-full border px-3 py-1.5 text-sm ${topic === item ? "iq-accent-border iq-accent" : "iq-line iq-subtle"}`}>{item}</button>
@@ -76,7 +70,7 @@ export const CourseDetailPage = () => {
         </div>
         <p className="mt-3 text-sm iq-muted">
           Created by {course.creatorName} on <a className="iq-link underline" href={course.channelUrl} target="_blank" rel="noreferrer">{course.channelName}</a>.
-          IQNex does not re-host this video. <a className="iq-link underline" href={course.sourceUrl} target="_blank" rel="noreferrer">Watch on YouTube</a>.
+          IQNex does not re-host this video. <a className="iq-link underline" href={course.sourceUrl} target="_blank" rel="noreferrer">Watch on IQNex</a>.
         </p>
         <div className="mt-8 grid gap-6 md:grid-cols-2">
           <div>
@@ -120,57 +114,6 @@ export const PathsPage = () => (
           </article>
         ))}
       </div>
-    </div>
-  </PublicShell>
-);
-
-export const EventsPage = () => (
-  <PublicShell title="Events">
-    <div className={wrap}>
-      <h1 className="text-4xl font-semibold" style={{ fontFamily: '"Space Grotesk", Inter, sans-serif' }}>Events</h1>
-      <div className="mt-8 space-y-4">
-        {EVENTS.map((event) => (
-          <article key={event.slug} id={event.slug} className="rounded-2xl border iq-line p-5">
-            <div className="flex flex-wrap items-center gap-3 text-xs uppercase tracking-[0.14em] iq-faint"><span>{event.kind}</span><span>{event.city}</span><Countdown when={event.when} /></div>
-            <h2 className="mt-2 text-2xl font-semibold">{event.title}</h2>
-            <p className="mt-2 iq-muted">{event.summary}</p>
-            <p className="mt-3 text-sm">{event.prize}</p>
-            <a className="mt-4 inline-block text-sm iq-link" href={`mailto:contact@iqmath.in?subject=${encodeURIComponent("Register: " + event.title)}`}>Request a seat</a>
-          </article>
-        ))}
-      </div>
-    </div>
-  </PublicShell>
-);
-
-export const HackathonsPage = () => (
-  <PublicShell title="Hackathons">
-    <div className={wrap}>
-      <h1 className="text-4xl font-semibold" style={{ fontFamily: '"Space Grotesk", Inter, sans-serif' }}>Hackathons</h1>
-      <div className="mt-8 grid gap-4 md:grid-cols-2">
-        {HACKATHONS.map((item) => (
-          <article key={item.slug} className="rounded-2xl border iq-line iq-surface p-5">
-            <Countdown when={item.when} />
-            <h2 className="mt-2 text-2xl font-semibold">{item.title}</h2>
-            <p className="mt-2 text-sm iq-muted">{item.summary}</p>
-            <p className="mt-3 text-sm">Tracks: {item.tracks.join(", ")}</p>
-            <p className="mt-1 text-sm">Prize: {item.prize}</p>
-            <a className="mt-4 inline-block text-sm iq-link" href={`mailto:contact@iqmath.in?subject=${encodeURIComponent("Team: " + item.title)}`}>Tell us your team</a>
-          </article>
-        ))}
-      </div>
-    </div>
-  </PublicShell>
-);
-
-export const CompetitionsPage = () => (
-  <PublicShell title="Competitions">
-    <div className={wrap}>
-      <h1 className="text-4xl font-semibold" style={{ fontFamily: '"Space Grotesk", Inter, sans-serif' }}>{COMPETITION.title}</h1>
-      <p className="mt-4 max-w-2xl iq-subtle">{COMPETITION.summary}</p>
-      <p className="mt-2 text-sm iq-muted">{COMPETITION.when}</p>
-      <p className="mt-6 max-w-2xl text-sm iq-muted">Timed attempts already live inside the instructor Code Arena and the student player. This page is the public brief. Sign in to enter from your account.</p>
-      <Link to="/login" className="mt-6 inline-flex rounded-full iq-ink-btn px-4 py-2 text-sm font-semibold">Sign in</Link>
     </div>
   </PublicShell>
 );

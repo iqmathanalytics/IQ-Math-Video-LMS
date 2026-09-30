@@ -63,7 +63,7 @@ export const RecordingLibrary = () => {
     <div>
       <p className="text-sm iq-muted"><Link to={`/my-courses/${courseId}`} className="iq-link">Back to course</Link></p>
       <h1 className="mt-2 text-3xl font-semibold">Recordings</h1>
-      <p className="mt-2 max-w-2xl text-sm iq-muted">{watched} of {rows.length} watched. Videos stay on YouTube. The creator and the YouTube player stay visible.</p>
+      <p className="mt-2 max-w-2xl text-sm iq-muted">{watched} of {rows.length} watched. Videos play on IQNex. The creator stays on the player.</p>
       {next && (
         <Link to={`/my-courses/${courseId}/recordings/${next.id}`} className="mt-4 inline-flex rounded-full iq-accent-bg px-4 py-3 text-sm font-semibold">
           {next.is_completed ? "Watch again" : "Continue"}: {next.title}
@@ -90,7 +90,7 @@ export const RecordingLibrary = () => {
                   <Link to={`/my-courses/${courseId}/recordings/${item.id}`} className="block rounded-2xl border iq-line p-4">
                     <p className="text-xs uppercase tracking-[0.14em] iq-faint">{item.is_completed ? "Watched" : item.last_position > 0 ? "In progress" : "New"}</p>
                     <h3 className="mt-1 font-semibold">{item.title}</h3>
-                    <p className="mt-1 text-sm iq-muted">{item.channel_name || "YouTube"}</p>
+                    <p className="mt-1 text-sm iq-muted">{item.channel_name || "IQNex"}</p>
                   </Link>
                 </li>
               ))}
@@ -158,11 +158,11 @@ export const RecordingPlayer = () => {
           {item.last_position > 0 && !fromStart && <button type="button" className="iq-link" onClick={() => setFromStart(true)}>Start over</button>}
           {previous && <Link className="iq-link" to={`/my-courses/${courseId}/recordings/${previous.id}`}>Previous</Link>}
           {next && <Link className="iq-link" to={`/my-courses/${courseId}/recordings/${next.id}`}>Next</Link>}
-          <a className="iq-link" href={watchUrl} target="_blank" rel="noreferrer">Watch on YouTube</a>
+          <a className="iq-link" href={watchUrl} target="_blank" rel="noreferrer">Watch on IQNex</a>
         </div>
         <p className="mt-3 text-sm iq-muted">
           {item.channel_name ? <>By {item.channel_url ? <a className="iq-link" href={item.channel_url} target="_blank" rel="noreferrer">{item.channel_name}</a> : item.channel_name}. </> : null}
-          Played from YouTube. IQNex does not host this video.
+          Played on IQNex. IQNex does not host this video.
         </p>
         {item.last_position > 0 && !fromStart && <p className="mt-2 text-sm iq-muted">Resumed at {Math.floor(item.last_position / 60)}:{String(item.last_position % 60).padStart(2, "0")}.</p>}
         {item.description && <p className="mt-4 whitespace-pre-wrap text-sm">{item.description}</p>}
@@ -247,13 +247,13 @@ export const RecordingAdmin = () => {
   return (
     <div className="text-slate-800">
       <h2 className="text-2xl font-semibold">Recordings</h2>
-      <p className="mt-1 max-w-2xl text-sm text-slate-600">Each link becomes a lesson in this course. Use a public or unlisted YouTube video. Private videos cannot be embedded. Chapters can be written as lines like 00:00 Introduction.</p>
+      <p className="mt-1 max-w-2xl text-sm text-slate-600">Each link becomes a lesson in this course. Use a public or unlisted IQNex video. Private videos cannot be embedded. Chapters can be written as lines like 00:00 Introduction.</p>
       <form onSubmit={save} className="mt-5 grid gap-3 rounded-2xl border border-slate-300 bg-white p-5">
-        <label className="text-sm">YouTube link
-          <input value={link} onChange={(event) => onLink(event.target.value)} required className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" placeholder="https://www.youtube.com/watch?v=" />
+        <label className="text-sm">IQNex link
+          <input value={link} onChange={(event) => onLink(event.target.value)} required className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" placeholder="https://" />
         </label>
         <label className="text-sm">Title
-          <input value={title} onChange={(event) => setTitle(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" placeholder="Uses the YouTube title if left empty" />
+          <input value={title} onChange={(event) => setTitle(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" placeholder="Uses the IQNex title if left empty" />
         </label>
         <label className="text-sm">Section
           <input value={section} onChange={(event) => setSection(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" />

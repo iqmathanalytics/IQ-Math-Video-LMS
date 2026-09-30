@@ -112,19 +112,21 @@ const PublicShell = ({ title, children }: { title?: string; children: ReactNode 
       <main id="content">{children}</main>
 
       <footer className="border-t iq-line">
-        <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:grid-cols-2">
+        <div className={`mx-auto grid max-w-6xl gap-8 px-4 py-12 ${NAV.length > 0 ? "sm:grid-cols-2" : ""}`}>
           <div>
             <BrandLogo tone={theme === "dark" ? "onDark" : "ink"} size="sm" />
-            <p className="mt-3 text-sm iq-muted">A learner account for courses, events, competitions and hackathons. Schedules and entries open after you sign in.</p>
+            <p className="mt-3 text-sm iq-muted">A learner account for IQNex courses. Your list opens after you sign in.</p>
           </div>
-          <div>
-            <p className="text-xs uppercase tracking-[0.16em] iq-faint">On this site</p>
-            <ul className="mt-3 space-y-2 text-sm">
-              {NAV.map((item) => (
-                <li key={item.path}><Link className="iq-subtle iq-hover-ink" to={item.path}>{item.label}</Link></li>
-              ))}
-            </ul>
-          </div>
+          {NAV.length > 0 && (
+            <div>
+              <p className="text-xs uppercase tracking-[0.16em] iq-faint">On this site</p>
+              <ul className="mt-3 space-y-2 text-sm">
+                {NAV.map((item) => (
+                  <li key={item.path}><Link className="iq-subtle iq-hover-ink" to={item.path}>{item.label}</Link></li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
         <div className="border-t iq-line px-4 py-4 text-xs iq-faint">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">

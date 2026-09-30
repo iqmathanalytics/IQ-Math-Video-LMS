@@ -1143,8 +1143,41 @@ async def execute_code(
 @app.get("/api/v1/courses")
 async def get_courses(db: AsyncSession = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     if current_user.role == "instructor":
-        res = await db.execute(select(models.Course).where(models.Course.instructor_id == current_user.id))
-        return res.scalars().all()
+        res = await db.execute(select(models.Course).order_by(models.Course.id.desc()))
+        courses = res.scalars().all()
+        course_ids = [course.id for course in courses]
+        module_counts: dict[int, int] = {}
+        lesson_counts: dict[int, int] = {}
+        if course_ids:
+            module_res = await db.execute(
+                select(models.Module.course_id, func.count(models.Module.id))
+                .where(models.Module.course_id.in_(course_ids))
+                .group_by(models.Module.course_id)
+            )
+            module_counts = {row[0]: row[1] for row in module_res.all()}
+            lesson_res = await db.execute(
+                select(models.Module.course_id, func.count(models.ContentItem.id))
+                .join(models.ContentItem, models.ContentItem.module_id == models.Module.id)
+                .where(models.Module.course_id.in_(course_ids))
+                .group_by(models.Module.course_id)
+            )
+            lesson_counts = {row[0]: row[1] for row in lesson_res.all()}
+        return [
+            {
+                "id": course.id,
+                "title": course.title,
+                "description": course.description,
+                "price": course.price,
+                "image_url": course.image_url,
+                "is_published": course.is_published,
+                "course_type": course.course_type,
+                "language": course.language,
+                "instructor_id": course.instructor_id,
+                "modules": module_counts.get(course.id, 0),
+                "lessons": lesson_counts.get(course.id, 0),
+            }
+            for course in courses
+        ]
     res = await db.execute(select(models.Course).where(models.Course.is_published == True))
     return res.scalars().all()
 
@@ -1183,7 +1216,6 @@ async def reorder_modules(course_id: int, req: ReorderModulesRequest, db: AsyncS
     res = await db.execute(select(models.Course).where(models.Course.id == course_id))
     course = res.scalars().first()
     if not course: raise HTTPException(status_code=404, detail="Course not found")
-    if course.instructor_id != current_user.id: raise HTTPException(status_code=403, detail="Not authorized")
 
     # 2. Fetch all modules for this course
     result = await db.execute(select(models.Module).where(models.Module.course_id == course_id))
@@ -1255,8 +1287,6 @@ async def _owned_course(course_id: int, user: models.User, db: AsyncSession):
     course = res.scalars().first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
-    if course.instructor_id != user.id:
-        raise HTTPException(status_code=403, detail="Not authorized")
     return course
 
 def _recording_payload(item: models.CourseRecording, progress: models.RecordingProgress | None, include_id: bool):
@@ -1319,7 +1349,7 @@ async def add_recording(course_id: int, body: RecordingIn, db: AsyncSession = De
     course = await _owned_course(course_id, current_user, db)
     parsed = parse_youtube_url(body.link)
     if not parsed or parsed.get("playlist"):
-        raise HTTPException(status_code=400, detail="Paste one public or unlisted YouTube video link. Playlist links are not added as a single recording.")
+        raise HTTPException(status_code=400, detail="Paste one public or unlisted IQNex video link. Playlist links are not added as a single recording.")
     video_id = parsed["video_id"]
     meta = await asyncio.to_thread(youtube_oembed, video_id)
     if not meta:
@@ -1443,14 +1473,18 @@ async def add_content(content: ContentCreate, db: AsyncSession = Depends(get_db)
     await db.commit()
     return {"message": "Content added"}
 
+class PublishRequest(BaseModel):
+    is_published: bool = True
+
 @app.patch("/api/v1/courses/{course_id}/publish")
-async def publish_course(course_id: int, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_instructor)):
+async def publish_course(course_id: int, body: PublishRequest = Body(default_factory=PublishRequest), db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_instructor)):
     res = await db.execute(select(models.Course).where(models.Course.id == course_id))
     course = res.scalars().first()
-    if course:
-        course.is_published = True
-        await db.commit()
-    return {"message": "Published"}
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    course.is_published = body.is_published
+    await db.commit()
+    return {"message": "Published" if course.is_published else "Hidden", "is_published": course.is_published}
 
 @app.get("/api/v1/library/items")
 async def list_library_items(
@@ -1569,8 +1603,6 @@ async def add_items_from_library(
         raise HTTPException(status_code=404, detail="Target module not found")
 
     target_module, target_course = target_pair
-    if target_course.instructor_id != current_user.id:
-        raise HTTPException(status_code=403, detail="You can add library items only to your own course module")
 
     item_ids = [item_id for item_id in payload.item_ids if isinstance(item_id, int)]
     if not item_ids:
@@ -1623,8 +1655,6 @@ async def import_modules_from_library(
     target_course = target_course_res.scalars().first()
     if not target_course:
         raise HTTPException(status_code=404, detail="Target course not found")
-    if target_course.instructor_id != current_user.id:
-        raise HTTPException(status_code=403, detail="You can import modules only into your own course")
 
     module_ids = [module_id for module_id in payload.module_ids if isinstance(module_id, int)]
     if not module_ids:
@@ -1698,10 +1728,6 @@ async def update_course_details(
     
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
-    
-    # 2. Verify Ownership
-    if course.instructor_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not authorized to edit this course")
 
     # 3. Update Fields if provided
     if update.title: course.title = update.title
@@ -2187,7 +2213,7 @@ async def get_all_students(db: AsyncSession = Depends(get_db), current_user: mod
 
 @app.get("/api/v1/admin/overview")
 async def admin_overview(db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_instructor)):
-    courses_res = await db.execute(select(models.Course).where(models.Course.instructor_id == current_user.id))
+    courses_res = await db.execute(select(models.Course))
     courses = courses_res.scalars().all()
     course_ids = [course.id for course in courses]
     students_res = await db.execute(select(models.User).where(models.User.role == "student"))
@@ -2350,7 +2376,7 @@ async def add_watch_lesson(body: WatchLessonIn, db: AsyncSession = Depends(get_d
     if len(title) < 2:
         raise HTTPException(status_code=400, detail="Enter a lesson title.")
     if not video_id:
-        raise HTTPException(status_code=400, detail="Paste a YouTube link or an 11-character video id.")
+        raise HTTPException(status_code=400, detail="Paste an IQNex link or an 11-character video id.")
     row = models.WatchLesson(title=title[:255], youtube_id=video_id)
     db.add(row)
     await db.commit()

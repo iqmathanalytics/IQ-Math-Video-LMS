@@ -128,9 +128,8 @@ const LearnerAuth = () => {
         <ul className="mt-6 space-y-4">
           {[
             ["Courses", "Lessons in order, with progress saved on your account."],
-            ["Events", "Dates and agendas appear after you sign in."],
-            ["Competitions", "Timed work and results stay in the account."],
-            ["Hackathons", "Team briefs and submissions open after you sign in."],
+            ["My learning", "Pick up a course where you left it."],
+            ["Certificates", "Download a certificate after the course is complete."],
           ].map(([title, text]) => (
             <li key={title} className="rounded-2xl border iq-line iq-surface p-4">
               <p className="font-semibold">{title}</p>
@@ -139,7 +138,7 @@ const LearnerAuth = () => {
           ))}
         </ul>
       </div>
-      <p className="text-sm iq-muted">Lessons stay on YouTube. Your account keeps progress after you sign in.</p>
+      <p className="text-sm iq-muted">Lessons stay on IQNex. Your account keeps progress after you sign in.</p>
     </aside>
   );
 

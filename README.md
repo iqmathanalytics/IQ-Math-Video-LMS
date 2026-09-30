@@ -134,3 +134,77 @@ Before running these, ensure you configure them to match your local database set
 python seed_admin.py
 python seed_student.py
 ```
+
+---
+
+## Deploy on Render
+
+Production uses the Blueprint in `render.yaml`. It creates two services. Secret values are not stored in the repo. Copy them from your local `backend/.env` and `frontend/.env` into the Render Dashboard when the Blueprint asks for each `sync: false` key.
+
+Dashboard link (works after `render.yaml` is on `main`):
+
+https://dashboard.render.com/blueprint/new?repo=https://github.com/iqmathanalytics/IQ-Math-Video-LMS
+
+### Services
+
+| Service | Type | Root | Build | Start / publish |
+| --- | --- | --- | --- | --- |
+| `iqmath-backend` | Python web, free, Oregon | `backend` | `pip install -r requirements.txt` | `uvicorn main:app --host 0.0.0.0 --port $PORT` |
+| `iqmath-frontend` | Static site, Node 20 | `frontend` | `npm ci && npm run build` | `frontend/dist` |
+
+The API health check is `/docs`. The site rewrites unknown paths to `/index.html` so client-side routes keep working.
+
+The database stays on TiDB Cloud or your existing PostgreSQL host. Render does not create a new database. `DATABASE_URL` is the same connection string as in `backend/.env`.
+
+### Backend environment (`iqmath-backend`)
+
+Set these in the Render Dashboard. Non-secret values are already in `render.yaml`.
+
+| Key | Value |
+| --- | --- |
+| `PYTHON_VERSION` | `3.12.8` (set by the Blueprint) |
+| `SECRET_KEY` | from `backend/.env` |
+| `ALGORITHM` | `HS256` |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `60` |
+| `DATABASE_URL` | TiDB or PostgreSQL URL from `backend/.env` |
+| `RAZORPAY_KEY_ID` | from `backend/.env` |
+| `RAZORPAY_KEY_SECRET` | from `backend/.env` |
+| `GEMINI_API_KEY` | from `backend/.env` |
+| `EMAIL_SENDER` | from `backend/.env` |
+| `BREVO_API_KEY` | from `backend/.env` |
+| `JUDGE0_API_KEY` | from `backend/.env` |
+| `JUDGE0_API_HOST` | `judge0-ce.p.rapidapi.com` |
+| `AWS_LAMBDA_URL` | compiler Function URL from `backend/.env` |
+
+### Frontend environment (`iqmath-frontend`)
+
+Vite reads these at **build** time. After you change any `VITE_*` value, save with **Save, rebuild, and deploy**.
+
+| Key | Value |
+| --- | --- |
+| `NODE_VERSION` | `20` (set by the Blueprint) |
+| `VITE_API_URL` | `https://<iqmath-backend>.onrender.com/api/v1` |
+| `VITE_RAZORPAY_KEY_ID` | same public key as `RAZORPAY_KEY_ID` |
+| `VITE_RAZORPAY_PAYLINK_URL` | `https://razorpay.me/iqmathtechnologies` |
+| `VITE_FIREBASE_API_KEY` | from `frontend/.env` |
+| `VITE_FIREBASE_AUTH_DOMAIN` | `iqmath-lms.firebaseapp.com` |
+| `VITE_FIREBASE_PROJECT_ID` | `iqmath-lms` |
+| `VITE_FIREBASE_STORAGE_BUCKET` | `iqmath-lms.firebasestorage.app` |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | from `frontend/.env` |
+| `VITE_FIREBASE_APP_ID` | from `frontend/.env` |
+| `VITE_FIREBASE_MEASUREMENT_ID` | from `frontend/.env` |
+
+Use the backend URL Render assigns after the API service is created. It must end with `/api/v1`.
+
+Firebase project: https://console.firebase.google.com/project/iqmath-lms/overview
+
+### Apply the Blueprint
+
+1. Push `render.yaml` to `main` on GitHub.
+2. Open the Dashboard link above and connect the `iqmathanalytics/IQ-Math-Video-LMS` repo if Render asks.
+3. Fill every secret the form lists. Use the tables above.
+4. Click **Apply**.
+5. When the backend URL is live, set `VITE_API_URL` on `iqmath-frontend` and rebuild that static site.
+6. Open `https://<iqmath-backend>.onrender.com/docs` and confirm it loads. Then open the frontend URL and sign in.
+
+Free web services sleep after inactivity. The first request after sleep can take up to a minute.

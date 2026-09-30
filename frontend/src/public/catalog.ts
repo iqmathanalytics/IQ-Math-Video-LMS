@@ -132,40 +132,10 @@ export const PATHS = [
   },
 ];
 
-export const EVENTS = [
-  {
-    slug: "studio-night-chennai",
-    title: "Studio night: build one feature in public",
-    kind: "Live",
-    city: "Chennai",
-    when: "2026-11-14T10:30:00+05:30",
-    summary: "A half-day working session. Bring a course you are stuck on and leave with a commit or a page.",
-    prize: "Open seats, no prize purse",
-  },
-  {
-    slug: "mentor-office-hours",
-    title: "Mentor office hours",
-    kind: "Hybrid",
-    city: "Online + KL",
-    when: "2026-12-05T18:00:00+05:30",
-    summary: "Thirty-minute slots with a course mentor. Bring a lesson you are stuck on, a bug, or a project.",
-    prize: "Included for enrolled learners",
-  },
-  {
-    slug: "campus-circuit-coimbatore",
-    title: "Campus circuit briefing",
-    kind: "Offline",
-    city: "Coimbatore",
-    when: "2027-01-18T09:30:00+05:30",
-    summary: "How IQNex runs a college cohort: attendance, projects, and a certificate a company can verify.",
-    prize: "Invitation only",
-  },
-];
-
 export const FAQS = [
   {
     q: "Are the videos hosted by IQNex?",
-    a: "No. Lessons play through the YouTube player. The creator's name, channel and source link stay on the page. We do not download or re-upload videos.",
+    a: "Lessons play on IQNex. The creator's name, channel and source link stay on the page. We do not download or re-upload videos.",
   },
   {
     q: "What do I get after I sign in?",
@@ -177,7 +147,4 @@ export const FAQS = [
   },
 ];
 
-export const NAV = [
-  { label: "Courses", path: "/#courses", group: "Programme" },
-  { label: "Events", path: "/#events", group: "Programme" },
-];
+export const NAV: { label: string; path: string; group: string }[] = [];

@@ -31,7 +31,7 @@ const DashboardLayout = () => {
     {
       label: "Learning",
       items: [
-        { label: "Courses", path: "/dashboard/courses", icon: <BookOpen size={20} /> },
+        { label: "Uploaded courses", path: "/dashboard/courses", icon: <BookOpen size={20} /> },
         { label: "Create course", path: "/dashboard/create-course", icon: <PlusCircle size={20} /> },
         { label: "Assessments", path: "/dashboard/assignments", icon: <FolderOpen size={20} /> },
         { label: "Code arena", path: "/dashboard/code-arena", icon: <Code size={20} /> },
@@ -43,7 +43,6 @@ const DashboardLayout = () => {
         { label: "Students", path: "/dashboard/students", icon: <Users size={20} /> },
         { label: "Admit students", path: "/dashboard/add-admits", icon: <UserPlus size={20} /> },
         { label: "Certificates", path: "/dashboard/certificates", icon: <Award size={20} /> },
-        { label: "Programs", path: "/dashboard/programs", icon: <PlusCircle size={20} /> },
         { label: "Messages", path: "/dashboard/messages", icon: <MessageSquare size={20} /> },
       ],
     },
