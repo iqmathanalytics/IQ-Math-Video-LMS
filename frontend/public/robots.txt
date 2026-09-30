@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /admin-login
+Disallow: /dashboard
+Disallow: /student-dashboard
+Disallow: /course/
