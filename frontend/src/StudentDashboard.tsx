@@ -690,8 +690,7 @@ const StudentDashboard = () => {
         if (!activeTest) return;
         try {
             await axios.post(`${API_BASE_URL}/code-tests/submit`, {
-                test_id: activeTest.id, score: disqualified ? 0 : (executionStatus === "success" ? 100 : 40),
-                problems_solved: Object.keys(solutions).length, time_taken: "Finished"
+                test_id: activeTest.id, time_taken: "Finished"
             }, { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
             setActiveTest(null); localStorage.removeItem(`sols_${activeTest.id}`);
             if (document.fullscreenElement) document.exitFullscreen();
@@ -907,7 +906,7 @@ const StudentDashboard = () => {
         <div className="min-h-screen bg-[#F8FAFC] font-sans">
 
             {/* 1. HEADER BAR */}
-            <header className="bg-white border-b border-slate-200 px-4 lg:px-8 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
+            <header className="bg-white border-b border-slate-200 px-4 lg:px-8 py-4 flex justify-between items-center sticky top-0 z-40 shadow-sm">
 
                 {/* Left: Logo & Mobile Toggle */}
                 <div className="flex items-center gap-4">

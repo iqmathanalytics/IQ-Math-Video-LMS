@@ -139,6 +139,36 @@ body {
 .iq-link { color: var(--iq-link); }
 .iq-track { background: var(--iq-track); }
 .iq-ink-btn { background: var(--iq-ink); color: var(--iq-ink-text); }
+.iq-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  height: 2rem;
+  padding: 0 0.8rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--iq-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  text-decoration: none;
+}
+.iq-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.iq-btn-primary { background: var(--iq-accent); color: var(--iq-accent-ink); }
+.iq-btn-primary:hover { filter: brightness(0.96); }
+.iq-btn-line { background: var(--iq-surface); border-color: var(--iq-border); color: var(--iq-text); }
+.iq-btn-line:hover { background: var(--iq-hover); }
+.iq-btn-quiet { background: var(--iq-inset); color: var(--iq-subtle); }
+.iq-btn-quiet:hover { background: var(--iq-hover); color: var(--iq-text); }
+.iq-btn-danger { background: var(--iq-surface); border-color: var(--iq-border); color: #b42318; }
+.iq-btn-danger:hover { background: rgba(180, 35, 24, 0.08); }
+.iq-btn-icon { width: 2rem; padding: 0; background: var(--iq-inset); color: var(--iq-text); }
+.iq-btn-icon:hover { background: var(--iq-hover); }
+.iq-btn-block { width: 100%; }
 .iq-hover:hover { background: var(--iq-hover); }
 .iq-hover-ink:hover { color: var(--iq-text); }
 .iq-divide > :not([hidden]) ~ :not([hidden]) { border-color: var(--iq-border); }

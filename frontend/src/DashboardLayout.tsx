@@ -46,6 +46,7 @@ const DashboardLayout = () => {
         { label: "Admit students", path: "/dashboard/add-admits", icon: <UserPlus size={20} /> },
         { label: "Certificates", path: "/dashboard/certificates", icon: <Award size={20} /> },
         { label: "Messages", path: "/dashboard/messages", icon: <MessageSquare size={20} /> },
+        { label: "Programs", path: "/dashboard/programs", icon: <Award size={20} /> },
       ],
     },
   ];
@@ -176,7 +177,7 @@ const DashboardLayout = () => {
       <main className="flex-1 flex flex-col h-full overflow-hidden relative w-full">
 
         {/* HEADER */}
-        <header className="h-20 border-b iq-line iq-header backdrop-blur-xl flex items-center justify-between px-6 lg:px-10 shrink-0">
+        <header className="relative z-30 h-20 border-b iq-line iq-header backdrop-blur-xl flex items-center justify-between px-6 lg:px-10 shrink-0">
           <div className="flex items-center gap-4">
             <button onClick={() => setMobileMenuOpen(true)} className="lg:hidden p-2 -ml-2 iq-muted">
               <Menu size={24} />

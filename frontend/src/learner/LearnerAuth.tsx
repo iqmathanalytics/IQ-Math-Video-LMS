@@ -1,39 +1,50 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import BrandLogo from "../components/BrandLogo";
 import API_BASE_URL from "../config";
-import { TOPICS } from "../public/catalog";
 import { useDayTheme } from "../public/useDayTheme";
 import { saveSession } from "../utils/session";
 import { Field, PasswordMeter, SubmitButton, fieldClass, passwordScore } from "./ui";
 
 const REMEMBER_KEY = "iqnex-remember-email";
-const GOALS_KEY = "iqnex-learner-goals";
 
-type Mode = "signin" | "signup" | "forgot";
+type Mode = "signin" | "signup" | "forgot" | "reset";
 
 const emailOk = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+const contactOk = (value: string) => value.replace(/\D/g, "").length >= 10;
+
+const apiMessage = (data: unknown, fallback: string) => {
+  if (!data || typeof data !== "object" || !("detail" in data)) return fallback;
+  const detail = (data as { detail: unknown }).detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail) && detail[0] && typeof detail[0] === "object" && "msg" in detail[0]) {
+    return String((detail[0] as { msg: unknown }).msg);
+  }
+  return fallback;
+};
 
 const LearnerAuth = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useDayTheme();
-  const mode: Mode = location.pathname === "/signup" ? "signup" : location.pathname === "/forgot-password" ? "forgot" : "signin";
+  const [searchParams] = useSearchParams();
+  const mode: Mode = location.pathname === "/signup" ? "signup" : location.pathname === "/forgot-password" ? "forgot" : location.pathname === "/reset-password" ? "reset" : "signin";
 
-  const [step, setStep] = useState(1);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState(() => {
+    const state = location.state as { notice?: string } | null;
+    return state?.notice || "";
+  });
   const [error, setError] = useState("");
   const [offline, setOffline] = useState(!navigator.onLine);
   const [remember, setRemember] = useState(Boolean(localStorage.getItem(REMEMBER_KEY)));
   const [form, setForm] = useState({
     name: "",
     email: localStorage.getItem(REMEMBER_KEY) || "",
+    contact: "",
     password: "",
-    topic: "AI",
-    level: "Beginner",
-    hours: "4",
+    confirm: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -50,8 +61,7 @@ const LearnerAuth = () => {
 
   useEffect(() => {
     setError("");
-    setNotice("");
-    setStep(1);
+    if (mode !== "signin") setNotice("");
   }, [mode]);
 
   const set = (key: string, value: string) => setForm((current) => ({ ...current, [key]: value }));
@@ -81,7 +91,8 @@ const LearnerAuth = () => {
       navigate("/home");
     } catch (err: unknown) {
       if (!axios.isAxiosError(err) || !err.response) setError("The learner service is not reachable. Check that the API is running, then try again.");
-      else setError(typeof err.response.data?.detail === "string" ? err.response.data.detail : "Those details were not accepted.");
+      else if (err.response.status === 401) setError("That email and password do not match an account. Create an account, or check both fields.");
+      else setError(apiMessage(err.response.data, "Those details were not accepted."));
     } finally {
       setBusy(false);
     }
@@ -89,9 +100,11 @@ const LearnerAuth = () => {
 
   const createAccount = async () => {
     const next: Record<string, string> = {};
-    if (form.name.trim().length < 2) next.name = "Enter the name you want on your learning record.";
+    if (form.name.trim().length < 2) next.name = "Enter your name.";
     if (!emailOk(form.email)) next.email = "Enter a valid email.";
+    if (!contactOk(form.contact)) next.contact = "Enter a contact number with at least 10 digits.";
     if (passwordScore(form.password) < 3) next.password = "Use 8 or more characters, mixed case, and a number.";
+    if (form.confirm !== form.password) next.confirm = "Passwords do not match.";
     setErrors(next);
     if (Object.keys(next).length) return;
 
@@ -103,19 +116,49 @@ const LearnerAuth = () => {
         password: form.password,
         name: form.name.trim(),
         role: "student",
-        phone_number: null,
+        phone_number: form.contact.trim(),
       });
-      localStorage.setItem(GOALS_KEY, JSON.stringify({
-        topic: form.topic,
-        level: form.level,
-        hours: Number(form.hours),
-      }));
-      setNotice("Account created. Sign in with that email and password.");
-      setForm((current) => ({ ...current, password: "" }));
-      navigate("/login");
+      localStorage.setItem(REMEMBER_KEY, form.email.trim());
+      navigate("/login", { state: { notice: "Account created. Sign in with that email and password." } });
     } catch (err: unknown) {
       if (!axios.isAxiosError(err) || !err.response) setError("The learner service is not reachable. Nothing was saved.");
-      else setError(typeof err.response.data?.detail === "string" ? err.response.data.detail : "The account could not be created.");
+      else setError(apiMessage(err.response.data, "The account could not be created."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const requestReset = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!emailOk(form.email)) { setErrors({ email: "Enter the email on your learner account." }); return; }
+    setBusy(true);
+    setError("");
+    try {
+      const res = await axios.post(`${API_BASE_URL}/forgot-password`, { email: form.email.trim() });
+      setNotice(res.data?.message || "If that email has an account, a reset link is on its way.");
+    } catch (err: unknown) {
+      const detail = axios.isAxiosError(err) ? err.response?.data?.detail : "";
+      setError(typeof detail === "string" ? detail : "The reset email could not be sent.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resetPassword = async (event: FormEvent) => {
+    event.preventDefault();
+    const next: Record<string, string> = {};
+    if (passwordScore(form.password) < 3) next.password = "Use 8 or more characters, mixed case, and a number.";
+    if (form.confirm !== form.password) next.confirm = "Passwords do not match.";
+    setErrors(next);
+    if (Object.keys(next).length) return;
+    setBusy(true);
+    setError("");
+    try {
+      await axios.post(`${API_BASE_URL}/reset-password`, { token: searchParams.get("token") || "", new_password: form.password });
+      navigate("/login", { state: { notice: "Password updated. Sign in with the new password." } });
+    } catch (err: unknown) {
+      const detail = axios.isAxiosError(err) ? err.response?.data?.detail : "";
+      setError(typeof detail === "string" ? detail : "This reset link is invalid or has expired.");
     } finally {
       setBusy(false);
     }
@@ -176,76 +219,54 @@ const LearnerAuth = () => {
             )}
 
             {mode === "signup" && (
-              <form className="mt-8 space-y-4" onSubmit={(event) => {
-              event.preventDefault();
-              if (step === 1) {
-                const next: Record<string, string> = {};
-                if (form.name.trim().length < 2) next.name = "Enter the name you want on your learning record.";
-                if (!emailOk(form.email)) next.email = "Enter a valid email.";
-                if (passwordScore(form.password) < 3) next.password = "Use 8 or more characters, mixed case, and a number.";
-                setErrors(next);
-                if (Object.keys(next).length) return;
-                setStep(2);
-                return;
-              }
-              if (step === 2) { setStep(3); return; }
-              void createAccount();
-            }} noValidate>
+              <form className="mt-8 space-y-4" onSubmit={(event) => { event.preventDefault(); void createAccount(); }} noValidate>
                 <h1 className="text-3xl font-semibold" style={{ fontFamily: '"Space Grotesk", Inter, sans-serif' }}>Create a learner account</h1>
-                <p className="text-sm iq-muted">Step {step} of 3. This stays on your device until the account is created.</p>
-                {step === 1 && (
-                  <>
-                    <Field label="Name" error={errors.name}>
-                      <input className={fieldClass} value={form.name} onChange={(event) => set("name", event.target.value)} autoComplete="name" />
-                    </Field>
-                    <Field label="Email" error={errors.email}>
-                      <input className={fieldClass} type="email" value={form.email} onChange={(event) => set("email", event.target.value)} autoComplete="email" />
-                    </Field>
-                    <Field label="Password" error={errors.password}>
-                      <input className={fieldClass} type="password" value={form.password} onChange={(event) => set("password", event.target.value)} autoComplete="new-password" />
-                      <PasswordMeter password={form.password} />
-                    </Field>
-                  </>
-                )}
-                {step === 2 && (
-                  <>
-                    <Field label="What do you want to learn first?">
-                      <select className={fieldClass} value={form.topic} onChange={(event) => set("topic", event.target.value)}>
-                        {TOPICS.filter((topic) => topic !== "All").map((topic) => <option key={topic}>{topic}</option>)}
-                      </select>
-                    </Field>
-                    <Field label="Current level">
-                      <select className={fieldClass} value={form.level} onChange={(event) => set("level", event.target.value)}>
-                        <option>Beginner</option>
-                        <option>Intermediate</option>
-                        <option>Advanced</option>
-                      </select>
-                    </Field>
-                  </>
-                )}
-                {step === 3 && (
-                  <Field label="Hours you can study in a week">
-                    <select className={fieldClass} value={form.hours} onChange={(event) => set("hours", event.target.value)}>
-                      <option value="2">About 2</option>
-                      <option value="4">About 4</option>
-                      <option value="8">About 8</option>
-                    </select>
-                  </Field>
-                )}
-                <div className="flex gap-2">
-                  {step > 1 && <button type="button" className="rounded-full border iq-line px-4 py-3 text-sm" onClick={() => setStep(step - 1)}>Back</button>}
-                  <SubmitButton busy={busy}>{step === 3 ? "Create account" : "Continue"}</SubmitButton>
-                </div>
+                <p className="text-sm iq-muted">Name, email, contact, and password are all this page needs.</p>
+                <Field label="Name" error={errors.name}>
+                  <input className={fieldClass} value={form.name} onChange={(event) => set("name", event.target.value)} autoComplete="name" />
+                </Field>
+                <Field label="Mail" error={errors.email}>
+                  <input className={fieldClass} type="email" value={form.email} onChange={(event) => set("email", event.target.value)} autoComplete="email" />
+                </Field>
+                <Field label="Contact" error={errors.contact}>
+                  <input className={fieldClass} type="tel" value={form.contact} onChange={(event) => set("contact", event.target.value)} autoComplete="tel" placeholder="10-digit mobile number" />
+                </Field>
+                <Field label="Password" error={errors.password}>
+                  <input className={fieldClass} type="password" value={form.password} onChange={(event) => set("password", event.target.value)} autoComplete="new-password" />
+                  <PasswordMeter password={form.password} />
+                </Field>
+                <Field label="Confirm password" error={errors.confirm}>
+                  <input className={fieldClass} type="password" value={form.confirm} onChange={(event) => set("confirm", event.target.value)} autoComplete="new-password" />
+                </Field>
+                <SubmitButton busy={busy}>Create account</SubmitButton>
                 <p className="text-sm iq-muted">Already enrolled? <Link className="iq-link" to="/login">Sign in</Link></p>
               </form>
             )}
 
             {mode === "forgot" && (
-              <div className="mt-8 space-y-4">
-                <h1 className="text-3xl font-semibold" style={{ fontFamily: '"Space Grotesk", Inter, sans-serif' }}>Password help</h1>
-                <p className="text-sm iq-muted">This learner app does not email a reset link. An instructor resets a password from the student list, or you sign in with the password you chose when the account was created.</p>
-                <Link to="/login" className="inline-flex rounded-full iq-accent-bg px-4 py-3 text-sm font-semibold">Back to sign in</Link>
-              </div>
+              <form className="mt-8 space-y-4" onSubmit={requestReset} noValidate>
+                <h1 className="text-3xl font-semibold" style={{ fontFamily: '"Space Grotesk", Inter, sans-serif' }}>Reset your password</h1>
+                <p className="text-sm iq-muted">We email a link that works for 30 minutes. An instructor can also reset a password from the student list.</p>
+                <Field label="Email" error={errors.email}>
+                  <input className={fieldClass} type="email" value={form.email} onChange={(event) => set("email", event.target.value)} autoComplete="email" />
+                </Field>
+                <SubmitButton busy={busy}>Send reset link</SubmitButton>
+                <Link to="/login" className="inline-flex text-sm iq-link">Back to sign in</Link>
+              </form>
+            )}
+
+            {mode === "reset" && (
+              <form className="mt-8 space-y-4" onSubmit={resetPassword} noValidate>
+                <h1 className="text-3xl font-semibold" style={{ fontFamily: '"Space Grotesk", Inter, sans-serif' }}>Choose a new password</h1>
+                <Field label="New password" error={errors.password}>
+                  <input className={fieldClass} type="password" value={form.password} onChange={(event) => set("password", event.target.value)} autoComplete="new-password" />
+                  <PasswordMeter password={form.password} />
+                </Field>
+                <Field label="Confirm password" error={errors.confirm}>
+                  <input className={fieldClass} type="password" value={form.confirm} onChange={(event) => set("confirm", event.target.value)} autoComplete="new-password" />
+                </Field>
+                <SubmitButton busy={busy}>Update password</SubmitButton>
+              </form>
             )}
           </div>
         </main>

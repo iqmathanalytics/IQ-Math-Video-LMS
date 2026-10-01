@@ -86,7 +86,10 @@ const StudentManagement = () => {
 
   // ✅ NEW: Handle Password Reset
   const handleResetPassword = async () => {
-    if (!resetModal || !newPass) return;
+    if (!resetModal || newPass.length < 8) {
+      triggerToast("Use at least 8 characters.", "error");
+      return;
+    }
     try {
       const token = localStorage.getItem("token");
       await axios.patch(`${API_BASE_URL}/admin/students/${resetModal.id}/reset-password`,

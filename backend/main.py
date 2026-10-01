@@ -3,7 +3,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload 
-from sqlalchemy import and_, delete, func
+from sqlalchemy import and_, delete, func, update
 from pydantic import BaseModel
 import bcrypt 
 from jose import JWTError, jwt
@@ -12,11 +12,14 @@ from typing import List, Optional, Dict, Any, Tuple
 import models
 from database import engine, get_db, AsyncSessionLocal # Importing the Async engine and dependency
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 import requests
+import hashlib
 import io
 import json
+import mimetypes
 import os
+import secrets
 import smtplib
 import random
 import string
@@ -55,11 +58,10 @@ from googleapiclient.http import MediaIoBaseUpload
 from sqlalchemy import text
 from token_manager import TokenManager
 
+# Load environment variables before any os.getenv reads.
+load_dotenv()
 
 AWS_LAMBDA_URL = os.getenv("AWS_LAMBDA_URL")
-        
-# Load environment variables
-load_dotenv()
 
 # 1. Initialize Database Tables (Async approach is slightly different, but for now we keep sync creation for simplicity or use Alembic in prod)
 # For this setup, we will rely on the sync engine for table creation if needed, or assume tables exist.
@@ -78,6 +80,23 @@ async def init_models():
         
         # 2. ✅ AUTO-MIGRATION: Update existing tables (MySQL/TiDB only)
         if conn.dialect.name == "sqlite":
+            async def sqlite_add(table: str, column: str, definition: str):
+                info = await conn.execute(text(f"PRAGMA table_info({table})"))
+                names = {row[1] for row in info.fetchall()}
+                if column not in names:
+                    await conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {definition}"))
+            for table, column, definition in (
+                ("users", "phone_number", "phone_number VARCHAR(32)"),
+                ("users", "is_active", "is_active BOOLEAN DEFAULT 1"),
+                ("users", "created_at", "created_at TIMESTAMP"),
+                ("users", "last_login", "last_login TIMESTAMP"),
+                ("notifications", "is_read", "is_read BOOLEAN DEFAULT 0"),
+                ("content_items", "resource_links", "resource_links TEXT"),
+            ):
+                try:
+                    await sqlite_add(table, column, definition)
+                except Exception as exc:
+                    print(f"SQLite migration note ({table}.{column}): {exc}")
             return
         print("Checking for database migrations...")
         try:
@@ -90,6 +109,8 @@ async def init_models():
             # 🆕 FIX FOR YOUR ERROR: Add last_login column
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP;"))
             await conn.execute(text("ALTER TABLE content_items ADD COLUMN IF NOT EXISTS resource_links TEXT;"))
+            await conn.execute(text("ALTER TABLE courses MODIFY description TEXT;"))
+            await conn.execute(text("ALTER TABLE content_items MODIFY content TEXT;"))
             
             print("Database migrations applied successfully.")
         except Exception as e:
@@ -153,30 +174,59 @@ async def ensure_demo_users():
             ))
         await session.commit()
 
+_db_warm_task = None
+
+async def warm_db_pool():
+    async def ping():
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+    await asyncio.gather(ping(), ping(), ping())
+
+async def keep_db_warm():
+    while True:
+        await asyncio.sleep(20)
+        try:
+            async with engine.connect() as conn:
+                await conn.execute(text("SELECT 1"))
+        except Exception:
+            pass
+
 # Run DB Init on Startup
 @app.on_event("startup")
 async def on_startup():
+    global _db_warm_task
     await init_models()
     await ensure_sample_watch()
     await ensure_demo_users()
+    try:
+        await warm_db_pool()
+    except Exception as exc:
+        print(f"Database warmup skipped: {exc}")
+    _db_warm_task = asyncio.create_task(keep_db_warm())
     token_manager.start()
 
 @app.on_event("shutdown")
 async def on_shutdown():
+    if _db_warm_task:
+        _db_warm_task.cancel()
     token_manager.stop()
 
-# 2. CONFIG: CORS POLICY (Restricted for Security in Prod)
+# 2. CONFIG: CORS POLICY
+# Credentials and a wildcard origin cannot be combined. Set ALLOWED_ORIGINS in production.
+_default_origins = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173"
+_origins = [item.strip() for item in os.getenv("ALLOWED_ORIGINS", _default_origins).split(",") if item.strip()]
 app.add_middleware(
     CORSMiddleware,
-    # 🔒 SECURITY: In production, change "*" to ["https://your-frontend-domain.com"]
-    allow_origins=["*"], 
+    allow_origins=_origins,
     allow_credentials=True,
-    allow_methods=["*"], 
-    allow_headers=["*"], 
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # --- 🔐 SECURITY & AUTH CONFIG ---
-SECRET_KEY = os.getenv("SECRET_KEY", "fallback_secret_change_me_in_prod")
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY or SECRET_KEY == "fallback_secret_change_me_in_prod":
+    raise RuntimeError("Set a unique SECRET_KEY in backend/.env before starting the API.")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 60))
 
@@ -187,15 +237,33 @@ RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
 client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
 
+def razorpay_failure(exc: Exception) -> HTTPException:
+    message = str(exc)
+    print(f"Razorpay order failed: {type(exc).__name__}")
+    if "authentication" in message.lower():
+        return HTTPException(
+            status_code=502,
+            detail="Razorpay rejected this live key. In the Razorpay dashboard, open the same live key and copy its current Key Secret into RAZORPAY_KEY_SECRET in backend/.env, then restart the API.",
+        )
+    if isinstance(exc, requests.exceptions.ConnectionError):
+        return HTTPException(status_code=502, detail="The Razorpay service could not be reached. Try the payment again in a moment.")
+    return HTTPException(status_code=502, detail="Razorpay did not create the order. Check the live key and secret, then try again.")
+
 # --- ✨ GEMINI AI ---
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel(GEMINI_MODEL) if GEMINI_API_KEY else None
 
 # --- 📋 DATA MODELS ---
 # (Keeping your existing Pydantic models)
 class UserCreate(BaseModel):
-    email: str; password: str; name: str; role: str; phone_number: str
+    email: str
+    password: str
+    name: str
+    role: str
+    phone_number: Optional[str] = None
 
 class ModuleCreate(BaseModel):
     title: str; order: int
@@ -244,6 +312,10 @@ class PaymentVerifyRequest(BaseModel):
 
 class PasswordChange(BaseModel):
     new_password: str
+    current_password: str
+
+class AdminPasswordReset(BaseModel):
+    new_password: str
 
 # Code Test Models
 class ProblemSchema(BaseModel):
@@ -253,7 +325,10 @@ class CodeTestCreate(BaseModel):
     title: str; pass_key: str; time_limit: int; problems: List[ProblemSchema]
 
 class TestSubmission(BaseModel):
-    test_id: int; score: int; problems_solved: int; time_taken: str
+    test_id: int
+    score: Optional[int] = None
+    problems_solved: Optional[int] = None
+    time_taken: str = "Finished"
 
 class ContentUpdate(BaseModel):
     title: Optional[str] = None; url: Optional[str] = None; resource_links: Optional[List[ResourceLinkInput]] = None
@@ -292,7 +367,9 @@ class ChallengeCreate(BaseModel):
     title: str; description: str; difficulty: str; test_cases: str
  
 class ConfirmationRequest(BaseModel):
-    lesson_title: str; file_name: str
+    lesson_id: int
+    lesson_title: str = ""
+    file_name: str = ""
 
 class CodePayload(BaseModel):
     source_code: str
@@ -303,6 +380,7 @@ class CodePayload(BaseModel):
     # When both set, server loads canonical cases from DB (Code Arena integrity)
     code_test_id: Optional[int] = None
     problem_id: Optional[int] = None
+    challenge_id: Optional[int] = None
     # "dry_run" = only non-hidden cases (when loading from DB)
     execution_mode: Optional[str] = None
 
@@ -390,7 +468,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
     result = await db.execute(select(models.User).where(models.User.email == email))
     user = result.scalars().first()
     
-    if user is None: raise HTTPException(status_code=401, detail="User not found")
+    if user is None or user.is_active is False:
+        raise HTTPException(status_code=401, detail="User not found")
     return user
 
 async def require_instructor(current_user: models.User = Depends(get_current_user)):
@@ -402,6 +481,99 @@ async def require_student(current_user: models.User = Depends(get_current_user))
     if current_user.role != "student":
         raise HTTPException(status_code=403, detail="⛔ Access Forbidden: Students Only")
     return current_user
+
+def guess_mime(filename: str) -> str:
+    guessed, _ = mimetypes.guess_type(filename or "")
+    return guessed or "application/octet-stream"
+
+def safe_storage_name(user_id: int, original: str, suffix_hint: str = "") -> str:
+    base = os.path.basename(original or "upload")
+    base = re.sub(r"[^A-Za-z0-9._-]", "_", base)[:80] or "upload"
+    stamp = int(datetime.utcnow().timestamp())
+    extra = suffix_hint or os.path.splitext(base)[1].lower()
+    if extra and not base.endswith(extra):
+        base = f"{base}{extra}"
+    return f"{user_id}_{stamp}_{base}"
+
+def visible_test_cases(raw: Optional[str]) -> str:
+    try:
+        cases = json.loads(raw or "[]")
+    except Exception:
+        return "[]"
+    visible = []
+    for case in cases if isinstance(cases, list) else []:
+        if not isinstance(case, dict) or case.get("hidden"):
+            continue
+        visible.append({
+            "input": case.get("input", case.get("stdin", "")),
+            "output": case.get("output", case.get("expected", "")),
+            "hidden": False,
+        })
+    return json.dumps(visible)
+
+def course_brief(course: models.Course) -> dict:
+    return {
+        "id": course.id,
+        "title": course.title,
+        "description": course.description,
+        "price": course.price,
+        "image_url": course.image_url,
+        "is_published": bool(course.is_published),
+        "course_type": course.course_type,
+        "language": course.language,
+        "instructor_id": course.instructor_id,
+    }
+
+async def load_owned_course(course_id: int, user: models.User, db: AsyncSession) -> models.Course:
+    res = await db.execute(select(models.Course).where(models.Course.id == course_id))
+    course = res.scalars().first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    return course
+
+async def course_of_item(item_id: int, db: AsyncSession):
+    res = await db.execute(
+        select(models.Course, models.ContentItem)
+        .join(models.Module, models.Module.course_id == models.Course.id)
+        .join(models.ContentItem, models.ContentItem.module_id == models.Module.id)
+        .where(models.ContentItem.id == item_id)
+    )
+    return res.first()
+
+async def require_enrolment(user: models.User, course_id: int, db: AsyncSession):
+    res = await db.execute(select(models.Enrollment).where(
+        models.Enrollment.user_id == user.id,
+        models.Enrollment.course_id == course_id,
+    ))
+    row = res.scalars().first()
+    if not row:
+        raise HTTPException(status_code=403, detail="Enrol in this course first.")
+    if row.enrollment_type == "trial" and row.expiry_date and datetime.utcnow() > row.expiry_date:
+        raise HTTPException(status_code=402, detail="Trial expired")
+    return row
+
+async def remember_attempt(db: AsyncSession, user_id: int, passed: int, total: int, code_test_id=None, problem_id=None, challenge_id=None):
+    query = select(models.CodeAttempt).where(models.CodeAttempt.user_id == user_id)
+    if problem_id is not None:
+        query = query.where(models.CodeAttempt.problem_id == problem_id, models.CodeAttempt.code_test_id == code_test_id)
+    elif challenge_id is not None:
+        query = query.where(models.CodeAttempt.challenge_id == challenge_id)
+    else:
+        return
+    existing = (await db.execute(query)).scalars().first()
+    if not existing:
+        existing = models.CodeAttempt(
+            user_id=user_id,
+            code_test_id=code_test_id,
+            problem_id=problem_id,
+            challenge_id=challenge_id,
+        )
+        db.add(existing)
+    existing.passed = passed
+    existing.total = total
+    existing.all_passed = total > 0 and passed == total
+    existing.updated_at = datetime.utcnow()
+    await db.commit()
 
 def generate_random_password(length=8):
     characters = string.ascii_letters + string.digits + "!@#$"
@@ -420,8 +592,7 @@ def send_credentials_email(to_email: str, name: str, password: str = None, subje
     print(f"[BREVO API] Preparing to send to: {to_email}")
 
     if not api_key or not sender_email:
-        print("ERROR: BREVO_API_KEY or EMAIL_SENDER missing.")
-        return
+        raise Exception("BREVO_API_KEY or EMAIL_SENDER is not configured")
 
     # 2. Define the URL (Port 443 - Bypasses Render Firewall)
     url = "https://api.brevo.com/v3/smtp/email"
@@ -496,7 +667,7 @@ def upload_file_to_drive(file_obj, filename, folder_link):
 
         service = build('drive', 'v3', credentials=creds)
         file_metadata = { 'name': filename, 'parents': [folder_id] }
-        media = MediaIoBaseUpload(file_obj, mimetype='application/pdf', resumable=True)
+        media = MediaIoBaseUpload(file_obj, mimetype=guess_mime(filename), resumable=True)
         uploaded_file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
         return uploaded_file.get('id')
     except Exception as e:
@@ -624,22 +795,26 @@ async def generate_certificate_record(user_id: int, course_id: int, db: AsyncSes
 # --- 🚀 ASYNC API ENDPOINTS ---
 
 @app.post("/api/v1/users", status_code=201)
-async def create_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
-    # 1. Check if user exists
+@limiter.limit("8/minute")
+async def create_user(request: Request, user: UserCreate, db: AsyncSession = Depends(get_db)):
+    # Public signup is always a learner. Instructor accounts are created by seed or admit tools.
     result = await db.execute(select(models.User).where(models.User.email == user.email))
     if result.scalars().first():
         raise HTTPException(status_code=400, detail="Email already registered")
+    if len(user.password or "") < 8:
+        raise HTTPException(status_code=400, detail="Use at least 8 characters.")
     
-    # 2. Create User
     new_user = models.User(
         email=user.email, 
         hashed_password=get_password_hash(user.password), 
         full_name=user.name, 
-        role=user.role,
+        role="student",
         phone_number=user.phone_number
     )
     db.add(new_user)
     await db.commit()
+    await db.refresh(new_user)
+    await grant_published_courses(db, user_ids=[new_user.id])
 
     # 3. 📧 SEND OTP EMAIL
     otp_code = str(random.randint(100000, 999999))
@@ -671,23 +846,19 @@ async def create_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
     }
 
 @app.post("/api/v1/login", response_model=Token)
-async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
+@limiter.limit("10/minute")
+async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(models.User).where(models.User.email == form_data.username))
     user = result.scalars().first()
     
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
-    
-    # ✅ CHECK 1: Password Verification
-    if not user or not verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Incorrect email or password")
-    
-    # ✅ CHECK 2: Is the User Active? (Soft Delete Check)
-    if user.is_active is False:  # explicitly check for False
+
+    if user.is_active is False:
         raise HTTPException(status_code=403, detail="Account deactivated. Contact support.")
     
-    
-    
+    user.last_login = datetime.utcnow()
+    await db.commit()
     token = create_access_token(data={"sub": user.email, "role": user.role})
     return {"access_token": token, "token_type": "bearer", "role": user.role}
 @app.post("/api/v1/admin/admit-student")
@@ -735,6 +906,7 @@ async def admit_single_student(req: AdmitStudentRequest, db: AsyncSession = Depe
             enrolled.append(cid)
     
     await db.commit()
+    await grant_published_courses(db, user_ids=[student.id])
 
     if is_new_user:
         return {"message": f"User created & Email Sent! Enrolled in {len(enrolled)} courses.", "email_status": email_status}
@@ -755,7 +927,8 @@ async def bulk_admit_students(file: UploadFile = File(...), course_id: int = For
         raise HTTPException(status_code=400, detail="Missing 'email' column in file.")
     
     count = 0
-    email_tasks = [] # Store email tasks to run later
+    failed = []
+    touched_ids = []
 
     for _, row in df.iterrows():
         email = str(row["email"]).strip()
@@ -763,13 +936,17 @@ async def bulk_admit_students(file: UploadFile = File(...), course_id: int = For
         
         if not email or email.lower() == "nan": continue
         
-        # 1. Check if user exists
         res = await db.execute(select(models.User).where(models.User.email == email))
         student = res.scalars().first()
         
         if not student:
-            # Create new student
             bulk_password = generate_random_password()
+            try:
+                await asyncio.to_thread(send_credentials_email, email, name, bulk_password)
+            except Exception as exc:
+                print(f"Skipping {email}: {exc}")
+                failed.append(email)
+                continue
             student = models.User(
                 email=email, 
                 full_name=name, 
@@ -779,11 +956,7 @@ async def bulk_admit_students(file: UploadFile = File(...), course_id: int = For
             db.add(student)
             await db.commit()
             await db.refresh(student)
-            
-            # ✅ OPTIMIZATION: Add email to a task list (don't block the loop)
-            email_tasks.append((email, name, bulk_password))
         
-        # 2. Enroll in Course
         enrol_check = await db.execute(select(models.Enrollment).where(
             models.Enrollment.user_id == student.id, 
             models.Enrollment.course_id == course_id
@@ -792,23 +965,20 @@ async def bulk_admit_students(file: UploadFile = File(...), course_id: int = For
         if not enrol_check.scalars().first():
             db.add(models.Enrollment(user_id=student.id, course_id=course_id))
             count += 1
+        touched_ids.append(student.id)
     
     await db.commit()
+    if touched_ids:
+        await grant_published_courses(db, user_ids=touched_ids)
+    return {
+        "message": f"Enrolled {count} students. {len(failed)} new accounts were not created because the welcome email failed.",
+        "failed_emails": failed,
+    }
 
-    # 3. 🚀 Send Emails in Background (Non-blocking)
-    # This prevents the request from timing out if you upload 100 students
-    for email, name, password in email_tasks:
-        try:
-            # Run each email in a thread
-            await asyncio.to_thread(send_credentials_email, email, name, password)
-        except Exception as e:
-            print(f"Failed to email {email}: {e}")
-
-    return {"message": f"Successfully enrolled {count} students. Emails are being sent."}
-
-@app.post("/api/v1/ai/generate-challenge") # 👈 Changed from "/generate" to match Frontend
-async def generate_problem_content(req: AIGenerateRequest):
-    if not GEMINI_API_KEY: raise HTTPException(status_code=500, detail="API Key missing")
+@app.post("/api/v1/ai/generate-challenge")
+async def generate_problem_content(req: AIGenerateRequest, current_user: models.User = Depends(require_instructor)):
+    if not GEMINI_API_KEY or model is None:
+        raise HTTPException(status_code=500, detail="API Key missing")
     try:
         prompt = f"""Create a programming challenge on "{req.title}". OUTPUT JSON ONLY: {{ "description": "...", "test_cases": [ {{"input": "...", "output": "...", "hidden": false}} ] }}"""
         response = await asyncio.to_thread(model.generate_content, prompt)
@@ -837,11 +1007,14 @@ async def create_code_test(test: CodeTestCreate, db: AsyncSession = Depends(get_
     return {"message": "Test Created Successfully!"}
 
 @app.get("/api/v1/courses/{course_id}")
-async def get_course_details(course_id: int, db: AsyncSession = Depends(get_db)):
+async def get_course_details(course_id: int, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     result = await db.execute(select(models.Course).where(models.Course.id == course_id))
     course = result.scalars().first()
-    if not course: raise HTTPException(status_code=404, detail="Course not found")
-    return course
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    if current_user.role != "instructor" and not course.is_published:
+        raise HTTPException(status_code=403, detail="This course is not published.")
+    return course_brief(course)
 
 @app.get("/api/v1/code-tests")
 async def get_code_tests(db: AsyncSession = Depends(get_db), current_user: models.User = Depends(get_current_user)):
@@ -890,14 +1063,36 @@ async def start_code_test(test_id: int, pass_key: str = Form(...), db: AsyncSess
     if not test: raise HTTPException(status_code=404)
     if test.pass_key != pass_key: raise HTTPException(status_code=403, detail="Invalid Key")
     
-    return { "id": test.id, "title": test.title, "time_limit": test.time_limit, "problems": [{"id": p.id, "title": p.title, "description": p.description, "test_cases": p.test_cases} for p in test.problems] }
+    return { "id": test.id, "title": test.title, "time_limit": test.time_limit, "problems": [{"id": p.id, "title": p.title, "description": p.description, "test_cases": visible_test_cases(p.test_cases)} for p in test.problems] }
 
 @app.post("/api/v1/code-tests/submit")
 async def submit_test_result(sub: TestSubmission, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    result = models.TestResult(test_id=sub.test_id, user_id=current_user.id, score=sub.score, problems_solved=sub.problems_solved, time_taken=sub.time_taken)
+    test_res = await db.execute(select(models.CodeTest).options(selectinload(models.CodeTest.problems)).where(models.CodeTest.id == sub.test_id))
+    test = test_res.scalars().first()
+    if not test:
+        raise HTTPException(status_code=404, detail="Test not found")
+    already = await db.execute(select(models.TestResult).where(models.TestResult.test_id == sub.test_id, models.TestResult.user_id == current_user.id))
+    if already.scalars().first():
+        raise HTTPException(status_code=403, detail="Test already submitted.")
+    problems = list(test.problems or [])
+    attempt_res = await db.execute(select(models.CodeAttempt).where(
+        models.CodeAttempt.user_id == current_user.id,
+        models.CodeAttempt.code_test_id == sub.test_id,
+    ))
+    attempts = {row.problem_id: row for row in attempt_res.scalars().all()}
+    solved = sum(1 for problem in problems if attempts.get(problem.id) and attempts[problem.id].all_passed)
+    total = len(problems)
+    score = round(100 * solved / total) if total else 0
+    result = models.TestResult(
+        test_id=sub.test_id,
+        user_id=current_user.id,
+        score=score,
+        problems_solved=solved,
+        time_taken=sub.time_taken or "Finished",
+    )
     db.add(result)
     await db.commit()
-    return {"message": "Submitted"}
+    return {"message": "Submitted", "score": score, "problems_solved": solved}
 
 @app.get("/api/v1/code-tests/{test_id}/results")
 async def get_test_results(test_id: int, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_instructor)):
@@ -977,7 +1172,25 @@ async def _resolve_execute_test_cases(
 ) -> List[Dict[str, Any]]:
     """Use DB-backed cases for Code Arena when IDs are provided; otherwise trust the client list."""
     if payload.code_test_id is None or payload.problem_id is None:
-        return payload.test_cases
+        if payload.challenge_id is None:
+            return payload.test_cases
+        ch_res = await db.execute(select(models.CourseChallenge).where(models.CourseChallenge.id == payload.challenge_id))
+        challenge = ch_res.scalars().first()
+        if not challenge:
+            raise HTTPException(status_code=404, detail="Challenge not found")
+        if current_user.role == "student":
+            await require_enrolment(current_user, challenge.course_id, db)
+        elif current_user.role == "instructor":
+            await load_owned_course(challenge.course_id, current_user, db)
+        else:
+            raise HTTPException(status_code=403, detail="Not authorized")
+        try:
+            cases = json.loads(challenge.test_cases or "[]")
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=500, detail="Invalid stored test cases")
+        if payload.execution_mode == "dry_run":
+            cases = [c for c in cases if not c.get("hidden")]
+        return cases
 
     prob_res = await db.execute(select(models.Problem).where(models.Problem.id == payload.problem_id))
     prob = prob_res.scalars().first()
@@ -1033,12 +1246,17 @@ async def execute_code(
     try:
         # 1. Forward to AWS Lambda (The Runner)
         # We assume Lambda returns a list of results with "actual" output
-        response = requests.post(AWS_LAMBDA_URL, json={
-            "source_code": payload.source_code,
-            "language_id": payload.language_id,
-            "test_cases": test_cases,
-            "stdin": "" 
-        }, timeout=15)
+        response = await asyncio.to_thread(
+            requests.post,
+            AWS_LAMBDA_URL,
+            json={
+                "source_code": payload.source_code,
+                "language_id": payload.language_id,
+                "test_cases": test_cases,
+                "stdin": "",
+            },
+            timeout=15,
+        )
         
         try:
             data = response.json()
@@ -1120,6 +1338,7 @@ async def execute_code(
 
             # 2–3. RE-GRADE with same rules as local Pyodide (multi-line stdout, whitespace, numbers)
             ok, disp_a, disp_e = _judge_outputs_equal(raw_actual, raw_expected)
+            hidden = bool(tc.get("hidden"))
             res["actual"] = disp_a
             res["expected"] = disp_e
             if ok:
@@ -1127,11 +1346,22 @@ async def execute_code(
                 passed_count += 1
             else:
                 res["status"] = "Failed"
+            if hidden and current_user.role != "instructor":
+                res["input"] = ""
+                res["expected"] = ""
+                res["actual"] = ""
+                res["hidden"] = True
 
         data["results"] = results_list
         data.setdefault("stats", {})
         data["stats"]["passed"] = passed_count
         data["stats"]["total"] = tc_count
+
+        if payload.execution_mode != "dry_run":
+            if payload.code_test_id is not None and payload.problem_id is not None:
+                await remember_attempt(db, current_user.id, passed_count, tc_count, code_test_id=payload.code_test_id, problem_id=payload.problem_id)
+            elif payload.challenge_id is not None:
+                await remember_attempt(db, current_user.id, passed_count, tc_count, challenge_id=payload.challenge_id)
 
         return data
 
@@ -1178,8 +1408,18 @@ async def get_courses(db: AsyncSession = Depends(get_db), current_user: models.U
             }
             for course in courses
         ]
-    res = await db.execute(select(models.Course).where(models.Course.is_published == True))
-    return res.scalars().all()
+    res = await db.execute(select(models.Course).where(models.Course.is_published == True).order_by(models.Course.id.desc()))
+    return [course_brief(course) for course in res.scalars().all()]
+
+@app.get("/api/v1/public/courses")
+async def public_courses(db: AsyncSession = Depends(get_db)):
+    res = await db.execute(select(models.Course).where(models.Course.is_published == True).order_by(models.Course.id.desc()))
+    rows = []
+    for course in res.scalars().all():
+        brief = course_brief(course)
+        brief.pop("instructor_id", None)
+        rows.append(brief)
+    return rows
 
 @app.post("/api/v1/courses")
 # 👇 CHANGE: Remove "schemas." prefix to use the local class
@@ -1204,6 +1444,7 @@ async def create_course(course: CourseCreate, db: AsyncSession = Depends(get_db)
 
 @app.post("/api/v1/courses/{course_id}/modules")
 async def create_module(course_id: int, module: ModuleCreate, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_instructor)):
+    await load_owned_course(course_id, current_user, db)
     new_module = models.Module(**module.dict(), course_id=course_id)
     db.add(new_module)
     await db.commit()
@@ -1212,7 +1453,6 @@ async def create_module(course_id: int, module: ModuleCreate, db: AsyncSession =
 
 @app.put("/api/v1/courses/{course_id}/modules/reorder")
 async def reorder_modules(course_id: int, req: ReorderModulesRequest, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_instructor)):
-    # 1. Verify Course Ownership
     res = await db.execute(select(models.Course).where(models.Course.id == course_id))
     course = res.scalars().first()
     if not course: raise HTTPException(status_code=404, detail="Course not found")
@@ -1283,11 +1523,7 @@ def youtube_oembed(video_id: str):
         return None
 
 async def _owned_course(course_id: int, user: models.User, db: AsyncSession):
-    res = await db.execute(select(models.Course).where(models.Course.id == course_id))
-    course = res.scalars().first()
-    if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
-    return course
+    return await load_owned_course(course_id, user, db)
 
 def _recording_payload(item: models.CourseRecording, progress: models.RecordingProgress | None, include_id: bool):
     try:
@@ -1447,12 +1683,18 @@ async def save_recording_progress(recording_id: int, body: RecordingProgressIn, 
     return {"last_position": row.last_position, "is_completed": row.is_completed}
 
 @app.get("/api/v1/courses/{course_id}/modules")
-async def get_modules(course_id: int, db: AsyncSession = Depends(get_db)):
+async def get_modules(course_id: int, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_instructor)):
+    await load_owned_course(course_id, current_user, db)
     res = await db.execute(select(models.Module).where(models.Module.course_id == course_id).order_by(models.Module.order))
-    return res.scalars().all()
+    return [{"id": module.id, "title": module.title, "order": module.order, "course_id": module.course_id} for module in res.scalars().all()]
 
 @app.post("/api/v1/content")
 async def add_content(content: ContentCreate, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_instructor)):
+    module_res = await db.execute(select(models.Module).where(models.Module.id == content.module_id))
+    module = module_res.scalars().first()
+    if not module:
+        raise HTTPException(status_code=404, detail="Module not found")
+    await load_owned_course(module.course_id, current_user, db)
     cleaned_resource_links = normalize_resource_links(content.resource_links)
     new_content = models.ContentItem(
         title=content.title, 
@@ -1478,12 +1720,11 @@ class PublishRequest(BaseModel):
 
 @app.patch("/api/v1/courses/{course_id}/publish")
 async def publish_course(course_id: int, body: PublishRequest = Body(default_factory=PublishRequest), db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_instructor)):
-    res = await db.execute(select(models.Course).where(models.Course.id == course_id))
-    course = res.scalars().first()
-    if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
+    course = await load_owned_course(course_id, current_user, db)
     course.is_published = body.is_published
     await db.commit()
+    if course.is_published:
+        await grant_published_courses(db, course_id=course.id)
     return {"message": "Published" if course.is_published else "Hidden", "is_published": course.is_published}
 
 @app.get("/api/v1/library/items")
@@ -1722,12 +1963,7 @@ async def update_course_details(
     db: AsyncSession = Depends(get_db), 
     current_user: models.User = Depends(require_instructor)
 ):
-    # 1. Fetch Course
-    result = await db.execute(select(models.Course).where(models.Course.id == course_id))
-    course = result.scalars().first()
-    
-    if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
+    course = await load_owned_course(course_id, current_user, db)
 
     # 3. Update Fields if provided
     if update.title: course.title = update.title
@@ -1757,19 +1993,29 @@ async def get_course_player(course_id: int, db: AsyncSession = Depends(get_db), 
     enrol_res = await db.execute(select(models.Enrollment).where(models.Enrollment.user_id == current_user.id, models.Enrollment.course_id == course_id))
     enrollment = enrol_res.scalars().first()
     
+    if current_user.role == "student" and not course.is_published:
+        raise HTTPException(status_code=403, detail="This course is not published.")
     if not enrollment and current_user.role != "instructor": raise HTTPException(status_code=403)
     if enrollment and enrollment.enrollment_type == "trial" and enrollment.expiry_date and datetime.utcnow() > enrollment.expiry_date:
         raise HTTPException(status_code=402, detail="Trial Expired")
 
-    # Fetch Progress
-    prog_res = await db.execute(select(models.LessonProgress).where(models.LessonProgress.user_id == current_user.id))
-    progress_records = prog_res.scalars().all()
+    item_ids = [item.id for module in course.modules for item in (module.items or [])]
+    if item_ids:
+        prog_res = await db.execute(select(models.LessonProgress).where(
+            models.LessonProgress.user_id == current_user.id,
+            models.LessonProgress.content_item_id.in_(item_ids),
+        ))
+    else:
+        prog_res = None
+    progress_records = prog_res.scalars().all() if prog_res is not None else []
     progress_map = {p.content_item_id: p for p in progress_records}
     completed_ids = {p.content_item_id for p in progress_records if p.is_completed}
 
     return {
         "id": course.id, 
-        "title": course.title, 
+        "title": course.title,
+        "price": course.price,
+        "enrollment_type": enrollment.enrollment_type if enrollment else None,
         "course_type": course.course_type,
         "language": course.language,
         "modules": [
@@ -1868,8 +2114,40 @@ async def generate_pdf_endpoint(course_id: int, db: AsyncSession = Depends(get_d
     )
     return StreamingResponse(pdf, media_type="application/pdf")
 
-@app.get("/api/v1/my-courses")
-async def get_my_courses(db: AsyncSession = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+async def grant_published_courses(db: AsyncSession, user_ids: list[int] | None = None, course_id: int | None = None):
+    """Enrol students in published free courses. Paid courses stay on Razorpay checkout."""
+    course_query = select(models.Course.id, models.Course.price).where(models.Course.is_published == True)
+    if course_id is not None:
+        course_query = course_query.where(models.Course.id == course_id)
+    rows = (await db.execute(course_query)).all()
+    published_ids = [row[0] for row in rows if int(row[1] or 0) <= 0]
+    if not published_ids:
+        return 0
+    if user_ids is None:
+        user_ids = list((await db.execute(select(models.User.id).where(models.User.role == "student"))).scalars().all())
+    if not user_ids:
+        return 0
+    existing = await db.execute(
+        select(models.Enrollment.user_id, models.Enrollment.course_id).where(
+            models.Enrollment.user_id.in_(user_ids),
+            models.Enrollment.course_id.in_(published_ids),
+        )
+    )
+    already = {(row[0], row[1]) for row in existing.all()}
+    added = 0
+    for uid in user_ids:
+        for cid in published_ids:
+            if (uid, cid) in already:
+                continue
+            db.add(models.Enrollment(user_id=uid, course_id=cid, enrollment_type="paid"))
+            added += 1
+    if added:
+        await db.commit()
+    return added
+
+async def enrolled_courses_for(db: AsyncSession, current_user: models.User):
+    if current_user.role == "student":
+        await grant_published_courses(db, user_ids=[current_user.id])
     # 1. Fetch enrollments with course details AND certificates
     res = await db.execute(
         select(models.Enrollment)
@@ -1914,7 +2192,7 @@ async def get_my_courses(db: AsyncSession = Depends(get_db), current_user: model
     # 3. Build response with enrollment status
     valid_courses = []
     for e in enrollments:
-        if e.course:
+        if e.course and (current_user.role != "student" or e.course.is_published):
             # Calculate Trial Status
             days_left = 0
             is_trial_expired = False
@@ -1948,8 +2226,40 @@ async def get_my_courses(db: AsyncSession = Depends(get_db), current_user: model
 
     return valid_courses
 
+@app.get("/api/v1/my-courses")
+async def get_my_courses(db: AsyncSession = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    return await enrolled_courses_for(db, current_user)
+
+@app.get("/api/v1/account")
+async def account_home(db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_student)):
+    courses = await enrolled_courses_for(db, current_user)
+    notes = await db.execute(
+        select(models.Notification)
+        .where(models.Notification.user_id == current_user.id)
+        .order_by(models.Notification.created_at.desc())
+        .limit(5)
+    )
+    notices = [
+        {"id": note.id, "title": note.title, "message": note.message, "is_read": bool(note.is_read)}
+        for note in notes.scalars().all()
+    ]
+    return {
+        "user": {
+            "id": current_user.id,
+            "full_name": current_user.full_name,
+            "email": current_user.email,
+            "phone_number": current_user.phone_number,
+        },
+        "courses": courses,
+        "notices": notices,
+    }
+
 @app.post("/api/v1/user/change-password")
 async def change_password(req: PasswordChange, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    if len(req.new_password or "") < 8:
+        raise HTTPException(status_code=400, detail="Use at least 8 characters.")
+    if not verify_password(req.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect.")
     current_user.hashed_password = get_password_hash(req.new_password)
     await db.commit()
     return {"message": "Password updated"}
@@ -1964,6 +2274,9 @@ async def delete_content(content_id: int, db: AsyncSession = Depends(get_db), cu
     
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
+    pair = await course_of_item(content_id, db)
+    if pair:
+        await load_owned_course(pair[0].id, current_user, db)
 
     try:
         # 2. ✅ CRITICAL FIX: Delete related dependencies first!
@@ -1993,6 +2306,9 @@ async def update_content(content_id: int, update: ContentUpdate, db: AsyncSessio
     res = await db.execute(select(models.ContentItem).where(models.ContentItem.id == content_id))
     item = res.scalars().first()
     if item: 
+        pair = await course_of_item(content_id, db)
+        if pair:
+            await load_owned_course(pair[0].id, current_user, db)
         if update.title: item.title = update.title
         if update.url: item.content = update.url
         if update.resource_links is not None:
@@ -2030,11 +2346,17 @@ async def create_payment_order(
             "user_id": str(current_user.id)
         }
     }
-    try:
-        order = await asyncio.to_thread(client.order.create, data=order_data)
-        return order
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Razorpay order creation failed: {str(e)}")
+    last_error = None
+    for attempt in range(2):
+        try:
+            order = await asyncio.to_thread(client.order.create, data=order_data)
+            return order
+        except Exception as e:
+            last_error = e
+            if "authentication" in str(e).lower() or attempt == 1:
+                break
+            await asyncio.sleep(0.5)
+    raise razorpay_failure(last_error)
 
 @app.post("/api/v1/payment/verify")
 async def verify_payment_and_unlock_course(
@@ -2072,8 +2394,20 @@ async def verify_payment_and_unlock_course(
     payment_status = str(payment.get("status") or "").lower()
     if paid_amount != expected_amount:
         raise HTTPException(status_code=400, detail="Payment amount mismatch")
-    if payment_status not in {"captured", "authorized"}:
-        raise HTTPException(status_code=400, detail=f"Payment not successful (status: {payment_status or 'unknown'})")
+    if payment_status != "captured":
+        raise HTTPException(status_code=400, detail=f"Payment not captured (status: {payment_status or 'unknown'})")
+
+    try:
+        order = await asyncio.to_thread(client.order.fetch, payload.razorpay_order_id)
+    except Exception:
+        raise HTTPException(status_code=502, detail="Unable to confirm the Razorpay order.")
+    notes = order.get("notes") or {}
+    if str(notes.get("course_id")) != str(payload.course_id) or str(notes.get("user_id")) != str(current_user.id):
+        raise HTTPException(status_code=400, detail="This payment belongs to a different checkout.")
+    if str(order.get("id")) != payload.razorpay_order_id:
+        raise HTTPException(status_code=400, detail="Order id mismatch")
+    if str(payment.get("order_id") or "") != payload.razorpay_order_id:
+        raise HTTPException(status_code=400, detail="Payment does not match this order.")
 
     enroll_res = await db.execute(
         select(models.Enrollment).where(
@@ -2110,14 +2444,17 @@ async def submit_assignment(file: UploadFile = File(...), lesson_title: str = Fo
     assignment_data = res.scalars().first()
     
     content = await file.read()
-    safe_filename = f"{current_user.full_name}_{file.filename}"
+    safe_filename = safe_storage_name(current_user.id, file.filename or "assignment")
     drive_status = "Not Uploaded"
 
-    if assignment_data and assignment_data.content:
-        file_stream = io.BytesIO(content)
-        # Run sync drive upload in thread
-        file_id = await asyncio.to_thread(upload_file_to_drive, file_stream, safe_filename, assignment_data.content)
-        if file_id: drive_status = "Uploaded"
+    if assignment_data:
+        pair = await course_of_item(assignment_data.id, db)
+        if pair and current_user.role == "student":
+            await require_enrolment(current_user, pair[0].id, db)
+        if assignment_data and assignment_data.content:
+            file_stream = io.BytesIO(content)
+            file_id = await asyncio.to_thread(upload_file_to_drive, file_stream, safe_filename, assignment_data.content)
+            if file_id: drive_status = "Uploaded"
     
     # Local Backup
     os.makedirs("assignments_backup", exist_ok=True)
@@ -2146,9 +2483,13 @@ async def submit_assignment(file: UploadFile = File(...), lesson_title: str = Fo
 
 @app.post("/api/v1/confirm-submission")
 async def confirm_submission(req: ConfirmationRequest, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    res = await db.execute(select(models.ContentItem).options(selectinload(models.ContentItem.module)).where(models.ContentItem.title == req.lesson_title, models.ContentItem.type == "assignment"))
-    assignment = res.scalars().first()
-    if not assignment: raise HTTPException(status_code=404)
+    pair = await course_of_item(req.lesson_id, db)
+    if not pair:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    course, assignment = pair
+    if assignment.type != "assignment":
+        raise HTTPException(status_code=400, detail="That lesson is not an assignment")
+    await require_enrolment(current_user, course.id, db)
 
     # 1. Create Submission Record
     new_sub = models.Submission(user_id=current_user.id, content_item_id=assignment.id, drive_link=f"Uploaded: {req.file_name}", status="Submitted")
@@ -2235,7 +2576,7 @@ async def admin_overview(db: AsyncSession = Depends(get_db), current_user: model
 
 @app.get("/api/v1/admin/certificates")
 async def admin_certificates(db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_instructor)):
-    courses_res = await db.execute(select(models.Course).where(models.Course.instructor_id == current_user.id))
+    courses_res = await db.execute(select(models.Course))
     owned = {course.id: course.title for course in courses_res.scalars().all()}
     if not owned:
         return []
@@ -2260,8 +2601,7 @@ async def admin_certificates(db: AsyncSession = Depends(get_db), current_user: m
 
 @app.delete("/api/v1/admin/students/{user_id}")
 async def delete_student(user_id: int, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_instructor)):
-    # 1. Find the student
-    res = await db.execute(select(models.User).where(models.User.id == user_id))
+    res = await db.execute(select(models.User).where(models.User.id == user_id, models.User.role == "student"))
     student = res.scalars().first()
     
     if not student: 
@@ -2280,6 +2620,9 @@ async def delete_student(user_id: int, db: AsyncSession = Depends(get_db), curre
         
         # Delete related Lesson Progress
         await db.execute(delete(models.LessonProgress).where(models.LessonProgress.user_id == user_id))
+        await db.execute(delete(models.LessonNote).where(models.LessonNote.user_id == user_id))
+        await db.execute(delete(models.PasswordReset).where(models.PasswordReset.user_id == user_id))
+        await db.execute(delete(models.CodeAttempt).where(models.CodeAttempt.user_id == user_id))
         
         # Delete related Certificates
         await db.execute(delete(models.UserCertificate).where(models.UserCertificate.user_id == user_id))
@@ -2289,6 +2632,15 @@ async def delete_student(user_id: int, db: AsyncSession = Depends(get_db), curre
         
         # Delete related Challenge Progress
         await db.execute(delete(models.ChallengeProgress).where(models.ChallengeProgress.user_id == user_id))
+
+        await db.execute(delete(models.CourseAssessment).where(models.CourseAssessment.user_id == user_id))
+        await db.execute(delete(models.RecordingProgress).where(models.RecordingProgress.user_id == user_id))
+        await db.execute(delete(models.ProgramRegistration).where(models.ProgramRegistration.user_id == user_id))
+        await db.execute(
+            update(models.ProgramItem)
+            .where(models.ProgramItem.created_by == user_id)
+            .values(created_by=None)
+        )
 
         # Finally, delete the User
         await db.delete(student)
@@ -2302,15 +2654,15 @@ async def delete_student(user_id: int, db: AsyncSession = Depends(get_db), curre
 
 # --- 🆕 ADD THIS TO main.py ---
 @app.patch("/api/v1/admin/students/{user_id}/reset-password")
-async def reset_student_password(user_id: int, req: PasswordChange, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_instructor)):
-    # 1. Find Student
+async def reset_student_password(user_id: int, req: AdminPasswordReset, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_instructor)):
     result = await db.execute(select(models.User).where(models.User.id == user_id))
     student = result.scalars().first()
     
-    if not student: 
+    if not student or student.role != "student":
         raise HTTPException(status_code=404, detail="Student not found")
+    if len(req.new_password or "") < 8:
+        raise HTTPException(status_code=400, detail="Use at least 8 characters.")
     
-    # 2. Reset Password
     student.hashed_password = get_password_hash(req.new_password)
     await db.commit()
     
@@ -2318,11 +2670,33 @@ async def reset_student_password(user_id: int, req: PasswordChange, db: AsyncSes
 
 @app.delete("/api/v1/courses/{course_id}")
 async def delete_course(course_id: int, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_instructor)):
-    res = await db.execute(select(models.Course).where(models.Course.id == course_id))
-    course = res.scalars().first()
-    if course:
-        await db.delete(course)
-        await db.commit()
+    course = await load_owned_course(course_id, current_user, db)
+    modules = (await db.execute(select(models.Module).where(models.Module.course_id == course_id))).scalars().all()
+    module_ids = [module.id for module in modules]
+    item_ids = []
+    if module_ids:
+        item_ids = (await db.execute(select(models.ContentItem.id).where(models.ContentItem.module_id.in_(module_ids)))).scalars().all()
+    if item_ids:
+        await db.execute(delete(models.LessonProgress).where(models.LessonProgress.content_item_id.in_(item_ids)))
+        await db.execute(delete(models.Submission).where(models.Submission.content_item_id.in_(item_ids)))
+        await db.execute(delete(models.LessonNote).where(models.LessonNote.content_item_id.in_(item_ids)))
+        await db.execute(delete(models.ContentItem).where(models.ContentItem.id.in_(item_ids)))
+    if module_ids:
+        await db.execute(delete(models.Module).where(models.Module.id.in_(module_ids)))
+    challenge_ids = (await db.execute(select(models.CourseChallenge.id).where(models.CourseChallenge.course_id == course_id))).scalars().all()
+    if challenge_ids:
+        await db.execute(delete(models.ChallengeProgress).where(models.ChallengeProgress.challenge_id.in_(challenge_ids)))
+        await db.execute(delete(models.CodeAttempt).where(models.CodeAttempt.challenge_id.in_(challenge_ids)))
+        await db.execute(delete(models.CourseChallenge).where(models.CourseChallenge.id.in_(challenge_ids)))
+    recording_ids = (await db.execute(select(models.CourseRecording.id).where(models.CourseRecording.course_id == course_id))).scalars().all()
+    if recording_ids:
+        await db.execute(delete(models.RecordingProgress).where(models.RecordingProgress.recording_id.in_(recording_ids)))
+        await db.execute(delete(models.CourseRecording).where(models.CourseRecording.id.in_(recording_ids)))
+    await db.execute(delete(models.Enrollment).where(models.Enrollment.course_id == course_id))
+    await db.execute(delete(models.UserCertificate).where(models.UserCertificate.course_id == course_id))
+    await db.execute(delete(models.CourseAssessment).where(models.CourseAssessment.course_id == course_id))
+    await db.delete(course)
+    await db.commit()
     return {"message": "Deleted"}
 
 # Live Sessions
@@ -2339,9 +2713,12 @@ async def start_live_session(req: LiveSessionRequest, db: AsyncSession = Depends
     return {"message": "Started", "session_id": new_session.id}
 
 @app.get("/api/v1/live/active")
-async def get_active_live_sessions(db: AsyncSession = Depends(get_db)):
+async def get_active_live_sessions(db: AsyncSession = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     res = await db.execute(select(models.LiveSession).where(models.LiveSession.is_active == True))
-    return res.scalars().all()
+    rows = res.scalars().all()
+    if current_user.role == "instructor":
+        rows = [row for row in rows if row.instructor_id == current_user.id]
+    return [{"id": row.id, "topic": row.topic, "youtube_url": row.youtube_url, "started_at": row.started_at} for row in rows]
 
 def youtube_id_from_link(value: str) -> Optional[str]:
     raw = (value or "").strip()
@@ -2397,9 +2774,12 @@ async def delete_watch_lesson(lesson_id: int, db: AsyncSession = Depends(get_db)
 async def end_live_session(session_id: int, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_instructor)):
     res = await db.execute(select(models.LiveSession).where(models.LiveSession.id == session_id))
     session = res.scalars().first()
-    if session:
-        session.is_active = False
-        await db.commit()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if session.instructor_id != current_user.id:
+        raise HTTPException(status_code=403, detail="This live class belongs to another instructor.")
+    session.is_active = False
+    await db.commit()
     return {"message": "Ended"}
 
 # Dashboard optimized
@@ -2416,7 +2796,6 @@ async def get_assignment_dashboard(db: AsyncSession = Depends(get_db), current_u
            # Assuming relationship back to submission exists? 
             # Actually better to just load course structure and then fetch submissions in batch
         )
-        .where(models.Course.instructor_id == current_user.id)
     )
     courses = result.scalars().all()
     
@@ -2481,6 +2860,10 @@ async def verify_assignment(submission_id: int, db: AsyncSession = Depends(get_d
     res = await db.execute(select(models.Submission).where(models.Submission.id == submission_id))
     sub = res.scalars().first()
     if not sub: raise HTTPException(status_code=404)
+    pair = await course_of_item(sub.content_item_id, db)
+    if not pair:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    await load_owned_course(pair[0].id, current_user, db)
     
     # 1. Update Status
     sub.status = "Verified"
@@ -2500,7 +2883,12 @@ async def verify_assignment(submission_id: int, db: AsyncSession = Depends(get_d
 
 # 1. Toggle Item Completion (The Green Tick)
 @app.post("/api/v1/content/{item_id}/complete")
-async def mark_item_complete(item_id: int, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+async def mark_item_complete(item_id: int, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_student)):
+    pair = await course_of_item(item_id, db)
+    if not pair:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+    course, _item = pair
+    await require_enrolment(current_user, course.id, db)
     # Check if progress record exists
     res = await db.execute(select(models.LessonProgress).where(
         models.LessonProgress.user_id == current_user.id, 
@@ -2553,6 +2941,9 @@ async def submit_course_assessment(
     enrol = await db.execute(select(models.Enrollment).where(models.Enrollment.user_id == current_user.id, models.Enrollment.course_id == course_id))
     if not enrol.scalars().first():
         raise HTTPException(status_code=403, detail="Enrol in this course before submitting the assessment.")
+    _done, total_items, finished = await check_progress_status(current_user.id, course_id, db)
+    if total_items == 0 or not finished:
+        raise HTTPException(status_code=400, detail="Finish every module before submitting the assessment.")
 
     folder_link = (link or "").strip()
     saved_name = ""
@@ -2597,6 +2988,7 @@ async def claim_course_certificate(course_id: int, db: AsyncSession = Depends(ge
     course = course_res.scalars().first()
     
     if not course: raise HTTPException(status_code=404)
+    await require_enrolment(current_user, course_id, db)
 
     submitted = await db.execute(select(models.CourseAssessment).where(
         models.CourseAssessment.user_id == current_user.id,
@@ -2604,6 +2996,10 @@ async def claim_course_certificate(course_id: int, db: AsyncSession = Depends(ge
     ))
     if not submitted.scalars().first():
         return {"status": "error", "message": "Upload the assessment file or project link before the certificate is issued."}
+
+    _done, total_items, finished = await check_progress_status(current_user.id, course_id, db)
+    if total_items == 0 or not finished:
+        return {"status": "error", "message": "Finish every lesson in the course before the certificate is issued."}
 
     await generate_certificate_record(current_user.id, course_id, db)
     return {"status": "success", "message": "Certificate Generated!", "certificate_ready": True}
@@ -2622,7 +3018,7 @@ async def get_course_challenges(course_id: int, db: AsyncSession = Depends(get_d
             "title": c.title,
             "description": c.description,
             "difficulty": c.difficulty,
-            "test_cases": c.test_cases,
+            "test_cases": c.test_cases if current_user.role == "instructor" else visible_test_cases(c.test_cases),
             "course_id": c.course_id
         })
 
@@ -2643,6 +3039,7 @@ async def get_course_challenges(course_id: int, db: AsyncSession = Depends(get_d
 # 3️⃣ ADD CREATE CHALLENGE
 @app.post("/api/v1/courses/{course_id}/challenges")
 async def create_course_challenge(course_id: int, challenge: ChallengeCreate, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_instructor)):
+    await load_owned_course(course_id, current_user, db)
     new_challenge = models.CourseChallenge(
         title=challenge.title,
         description=challenge.description,
@@ -2656,18 +3053,8 @@ async def create_course_challenge(course_id: int, challenge: ChallengeCreate, db
     return {"message": "Challenge added"}
 
 @app.post("/api/v1/login-otp")
-async def login_otp(req: OTPLoginRequest, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(models.User).where(models.User.phone_number == req.phone_number))
-    # ... logic continues
-    user = result.scalars().first()
-    
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found with this phone number")
-    
-    # 2. Since Firebase already verified the OTP on frontend, 
-    # we trust the request and issue a JWT
-    token = create_access_token(data={"sub": user.email, "role": user.role})
-    return {"access_token": token, "token_type": "bearer", "role": user.role}
+async def login_otp(req: OTPLoginRequest):
+    raise HTTPException(status_code=410, detail="Phone login is turned off. Sign in with email and password.")
 
 @app.post("/api/v1/proctoring/violation")
 async def record_violation(report: ViolationReport, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_student)):
@@ -2684,7 +3071,7 @@ async def record_violation(report: ViolationReport, db: AsyncSession = Depends(g
         progress.violation_count += 1
         
         # ✅ FIX 1: Strict Logic. If count is 2 or more, Terminate.
-        if progress.violation_count > 2: 
+        if progress.violation_count >= 2: 
             progress.is_terminated = True
             progress.is_completed = False
             
@@ -2720,6 +3107,7 @@ async def update_module(module_id: int, update: ModuleUpdate, db: AsyncSession =
     module = res.scalars().first()
     if not module:
         raise HTTPException(status_code=404, detail="Module not found")
+    await load_owned_course(module.course_id, current_user, db)
     
     module.title = update.title
     await db.commit()
@@ -2734,12 +3122,14 @@ async def delete_module(module_id: int, db: AsyncSession = Depends(get_db), curr
     
     if not module:
         raise HTTPException(status_code=404, detail="Module not found")
+    await load_owned_course(module.course_id, current_user, db)
     
     try:
         # Delete dependencies for ALL items in this module
         for item in module.items:
             await db.execute(delete(models.LessonProgress).where(models.LessonProgress.content_item_id == item.id))
             await db.execute(delete(models.Submission).where(models.Submission.content_item_id == item.id))
+            await db.execute(delete(models.LessonNote).where(models.LessonNote.content_item_id == item.id))
         
         # Now delete items
         await db.execute(delete(models.ContentItem).where(models.ContentItem.module_id == module_id))
@@ -2758,8 +3148,16 @@ class ReorderRequest(BaseModel):
 
 @app.put("/api/v1/modules/{module_id}/reorder")
 async def reorder_module_items(module_id: int, req: ReorderRequest, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_instructor)):
+    module_res = await db.execute(select(models.Module).where(models.Module.id == module_id))
+    module = module_res.scalars().first()
+    if not module:
+        raise HTTPException(status_code=404, detail="Module not found")
+    await load_owned_course(module.course_id, current_user, db)
+    owned_ids = set((await db.execute(select(models.ContentItem.id).where(models.ContentItem.module_id == module_id))).scalars().all())
     # Update the 'order' field for each item based on its index in the list
     for index, item_id in enumerate(req.item_ids):
+        if item_id not in owned_ids:
+            continue
         await db.execute(
             models.ContentItem.__table__.update()
             .where(models.ContentItem.id == item_id)
@@ -2960,7 +3358,14 @@ async def mark_challenge_solved(challenge_id: int, db: AsyncSession = Depends(ge
     if not challenge:
         raise HTTPException(status_code=404, detail="Challenge not found")
 
-    # 2. Insert into Progress Table (Idempotent)
+    attempt = await db.execute(select(models.CodeAttempt).where(
+        models.CodeAttempt.user_id == current_user.id,
+        models.CodeAttempt.challenge_id == challenge_id,
+        models.CodeAttempt.all_passed == True,
+    ))
+    if not attempt.scalars().first():
+        raise HTTPException(status_code=400, detail="The official tests have not passed yet.")
+
     try:
         # We use ON CONFLICT DO NOTHING to avoid errors if they solve it twice
         # Note: Ensure your DB has a UNIQUE constraint on (user_id, challenge_id)
@@ -2987,6 +3392,7 @@ async def update_challenge(challenge_id: int, update: ChallengeUpdate, db: Async
     
     if not challenge:
         raise HTTPException(status_code=404, detail="Challenge not found")
+    await load_owned_course(challenge.course_id, current_user, db)
 
     if update.title: challenge.title = update.title
     if update.description: challenge.description = update.description
@@ -3004,6 +3410,7 @@ async def delete_challenge(challenge_id: int, db: AsyncSession = Depends(get_db)
     
     if not challenge:
         raise HTTPException(status_code=404, detail="Challenge not found")
+    await load_owned_course(challenge.course_id, current_user, db)
         
     # Delete related progress first to avoid foreign key constraints
     await db.execute(text("DELETE FROM challenge_progress WHERE challenge_id = :cid"), {"cid": challenge_id})
@@ -3090,5 +3497,155 @@ async def generate_course_description_pdf(course_id: int, db: AsyncSession = Dep
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
     
+class NoteIn(BaseModel):
+    body: str = ""
+
+class ForgotIn(BaseModel):
+    email: str
+
+class ResetIn(BaseModel):
+    token: str
+    new_password: str
+
+def _hash_token(raw: str) -> str:
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+@app.get("/api/v1/courses/{course_id}/notes")
+async def list_notes(course_id: int, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_student)):
+    await require_enrolment(current_user, course_id, db)
+    res = await db.execute(
+        select(models.LessonNote, models.ContentItem.id)
+        .join(models.ContentItem, models.ContentItem.id == models.LessonNote.content_item_id)
+        .join(models.Module, models.Module.id == models.ContentItem.module_id)
+        .where(models.Module.course_id == course_id, models.LessonNote.user_id == current_user.id)
+    )
+    return [{"lesson_id": lesson_id, "body": note.body or ""} for note, lesson_id in res.all()]
+
+@app.put("/api/v1/courses/{course_id}/notes/{lesson_id}")
+async def save_note(course_id: int, lesson_id: int, body: NoteIn, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_student)):
+    await require_enrolment(current_user, course_id, db)
+    pair = await course_of_item(lesson_id, db)
+    if not pair or pair[0].id != course_id:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+    existing = await db.execute(select(models.LessonNote).where(
+        models.LessonNote.user_id == current_user.id,
+        models.LessonNote.content_item_id == lesson_id,
+    ))
+    row = existing.scalars().first()
+    if not row:
+        row = models.LessonNote(user_id=current_user.id, content_item_id=lesson_id)
+        db.add(row)
+    row.body = body.body or ""
+    row.updated_at = datetime.utcnow()
+    await db.commit()
+    return {"lesson_id": lesson_id, "body": row.body}
+
+@app.post("/api/v1/forgot-password")
+@limiter.limit("5/minute")
+async def forgot_password(request: Request, body: ForgotIn, db: AsyncSession = Depends(get_db)):
+    generic = {"message": "If that email has an account, a reset link is on its way."}
+    email = (body.email or "").strip()
+    result = await db.execute(select(models.User).where(models.User.email == email))
+    user = result.scalars().first()
+    if not user or user.is_active is False:
+        return generic
+    raw = secrets.token_urlsafe(32)
+    db.add(models.PasswordReset(
+        user_id=user.id,
+        token_hash=_hash_token(raw),
+        expires_at=datetime.utcnow() + timedelta(minutes=30),
+        used=False,
+    ))
+    await db.commit()
+    frontend = os.getenv("FRONTEND_URL", "http://localhost:5173").rstrip("/")
+    link = f"{frontend}/reset-password?token={raw}"
+    try:
+        await asyncio.to_thread(
+            send_credentials_email,
+            user.email,
+            user.full_name or "Student",
+            None,
+            "Reset your IQNex password",
+            f"Hello {user.full_name or 'there'},\n\nUse this link within 30 minutes to choose a new password:\n{link}\n\nIf you did not ask for this, you can ignore the email.",
+        )
+    except Exception as exc:
+        print(f"Password reset email failed: {exc}")
+        raise HTTPException(status_code=503, detail="The reset email could not be sent. Ask an instructor to reset the password from the student list.")
+    return generic
+
+@app.post("/api/v1/reset-password")
+@limiter.limit("8/minute")
+async def reset_password(request: Request, body: ResetIn, db: AsyncSession = Depends(get_db)):
+    if len(body.new_password or "") < 8:
+        raise HTTPException(status_code=400, detail="Use at least 8 characters.")
+    token_hash = _hash_token(body.token or "")
+    res = await db.execute(select(models.PasswordReset).where(models.PasswordReset.token_hash == token_hash, models.PasswordReset.used == False))
+    row = res.scalars().first()
+    if not row or row.expires_at < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="This reset link is invalid or has expired.")
+    user_res = await db.execute(select(models.User).where(models.User.id == row.user_id))
+    user = user_res.scalars().first()
+    if not user or user.is_active is False:
+        raise HTTPException(status_code=400, detail="This reset link is invalid or has expired.")
+    user.hashed_password = get_password_hash(body.new_password)
+    row.used = True
+    await db.commit()
+    return {"message": "Password updated. Sign in with the new password."}
+
+@app.get("/api/v1/instructor/submissions/{submission_id}/file")
+async def download_submission_file(submission_id: int, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_instructor)):
+    res = await db.execute(select(models.Submission).where(models.Submission.id == submission_id))
+    sub = res.scalars().first()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    pair = await course_of_item(sub.content_item_id, db)
+    if not pair:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    await load_owned_course(pair[0].id, current_user, db)
+    name = os.path.basename((sub.drive_link or "").replace("Uploaded:", "").strip())
+    if not name:
+        raise HTTPException(status_code=404, detail="No file is stored for this submission")
+    candidates = [
+        os.path.join("assignments_backup", name),
+        os.path.join(os.path.dirname(__file__), "assignments_backup", name),
+    ]
+    path = next((item for item in candidates if os.path.isfile(item)), "")
+    if not path:
+        raise HTTPException(status_code=404, detail="The file is not on this server. Check Google Drive if the upload succeeded there.")
+    return FileResponse(path, filename=name, media_type=guess_mime(name))
+
+@app.get("/api/v1/instructor/courses/{course_id}/assessments")
+async def instructor_assessments(course_id: int, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_instructor)):
+    await load_owned_course(course_id, current_user, db)
+    res = await db.execute(
+        select(models.CourseAssessment, models.User)
+        .join(models.User, models.User.id == models.CourseAssessment.user_id)
+        .where(models.CourseAssessment.course_id == course_id)
+        .order_by(models.CourseAssessment.submitted_at.desc())
+    )
+    rows = []
+    for item, student in res.all():
+        rows.append({
+            "student": student.full_name,
+            "email": student.email,
+            "file_name": item.file_name or "",
+            "link": item.link or "",
+            "submitted_at": item.submitted_at.strftime("%Y-%m-%d") if item.submitted_at else "",
+        })
+    return rows
+
+@app.get("/api/v1/instructor/assessments/file/{file_name}")
+async def download_assessment_file(file_name: str, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_instructor)):
+    safe_name = os.path.basename(file_name)
+    res = await db.execute(select(models.CourseAssessment).where(models.CourseAssessment.file_name == safe_name))
+    row = res.scalars().first()
+    if not row:
+        raise HTTPException(status_code=404, detail="File not found")
+    await load_owned_course(row.course_id, current_user, db)
+    path = os.path.join(os.path.dirname(__file__), "assessment_uploads", safe_name)
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(path, filename=safe_name, media_type=guess_mime(safe_name))
+
 @app.get("/")
-def read_root(): return {"status": "online", "message": "iQmath Military Grade API Active 🟢"}
+def read_root(): return {"status": "online", "message": "iQmath Military Grade API Active"}

@@ -21,6 +21,7 @@ import Messages from "./Messages";
 import WatchManager from "./WatchManager";
 import { Assessments, CertificatePage, CourseDashboard, LearnPage, MyCourses, Notebook, StudentSettings, StudentShell } from "./student/StudentStudio";
 import { CertificateGallery, CourseCatalog, ProfilePage, StudentHome } from "./student/StudentHub";
+import { InstructorPrograms, StudentPrograms } from "./Programs";
 import CodingCourseManager from "./CodingCourseManager";
 import { getValidSession } from "./utils/session";
 
@@ -35,6 +36,7 @@ function App() {
         <Route path="/login" element={<PublicOnlyRoute><LearnerAuth /></PublicOnlyRoute>} />
         <Route path="/signup" element={<PublicOnlyRoute><LearnerAuth /></PublicOnlyRoute>} />
         <Route path="/forgot-password" element={<PublicOnlyRoute><LearnerAuth /></PublicOnlyRoute>} />
+        <Route path="/reset-password" element={<LearnerAuth />} />
         <Route path="/admin-login" element={<PublicOnlyRoute><AdminLogin /></PublicOnlyRoute>} />
 
         <Route path="/dashboard" element={<ProtectedRoute requiredRole="instructor"><DashboardLayout /></ProtectedRoute>}>
@@ -53,6 +55,7 @@ function App() {
           <Route path="students" element={<StudentManagement />} />
           <Route path="settings" element={<InstructorSettings />} />
           <Route path="messages" element={<Messages />} />
+          <Route path="programs" element={<InstructorPrograms />} />
         </Route>
         
         <Route element={<ProtectedRoute requiredRole="student"><StudentShell /></ProtectedRoute>}>
@@ -69,6 +72,7 @@ function App() {
           <Route path="/my-courses/:courseId/certificate" element={<CertificatePage />} />
           <Route path="/learn/:courseId/:lessonId" element={<LearnPage />} />
           <Route path="/settings" element={<StudentSettings />} />
+          <Route path="/programs" element={<StudentPrograms />} />
         </Route>
         <Route path="/student-dashboard" element={<Navigate to="/home" replace />} />
         <Route path="/course/:courseId/player" element={<ProtectedRoute requiredRole="student"><CoursePlayer /></ProtectedRoute>} />

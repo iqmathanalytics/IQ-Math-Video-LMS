@@ -42,6 +42,22 @@ const AssignmentManager = () => {
     }
   };
 
+  const openFile = async (submissionId: number) => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.get(`${API_BASE_URL}/instructor/submissions/${submissionId}/file`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: "blob",
+      });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(res.data);
+      link.download = `submission-${submissionId}`;
+      link.click();
+    } catch {
+      triggerToast("The file is not on the server. Use the Drive link if the upload reached Google Drive.", "error");
+    }
+  };
+
   const verifyAssignment = async (submissionId: number) => {
     try {
       const token = localStorage.getItem("token");
@@ -140,6 +156,13 @@ const AssignmentManager = () => {
 
                                   <div className="flex items-center gap-2">
                                     {/* 🔗 THE MAGIC LINK */}
+                                    <button
+                                      type="button"
+                                      onClick={() => openFile(sub.submission_id)}
+                                      className="flex items-center gap-1 text-xs font-bold text-[#005EB8] hover:text-[#004a94] bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded transition-colors mr-2"
+                                    >
+                                      <ExternalLink size={14} /> File
+                                    </button>
                                     <a
                                       href={sub.drive_search_link}
                                       target="_blank"

@@ -16,12 +16,16 @@ const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("toke
 
 const AdminHome = () => {
   const [stats, setStats] = useState<Overview | null>(null);
+  const [live, setLive] = useState<{ id: number; topic: string }[]>([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
     axios.get(`${API_BASE_URL}/admin/overview`, { headers: authHeaders() })
       .then((res) => setStats(res.data))
       .catch(() => setError("The overview could not be loaded. Sign in again if this session has expired."));
+    axios.get(`${API_BASE_URL}/live/active`, { headers: authHeaders() })
+      .then((res) => setLive(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setLive([]));
   }, []);
 
   const cards = stats
@@ -39,7 +43,7 @@ const AdminHome = () => {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-semibold" style={{ fontFamily: '"Space Grotesk", Inter, sans-serif' }}>Overview</h2>
-        <p className="mt-1 max-w-2xl text-sm iq-muted">Counts come from this account: your courses, the students on the site, watch lessons, and certificates already issued.</p>
+        <p className="mt-1 max-w-2xl text-sm iq-muted">Counts cover every course on the site, the students, watch lessons, and certificates already issued.</p>
       </div>
       {error && <p className="text-sm iq-muted">{error}</p>}
       {!stats && !error && <p className="text-sm iq-muted">Loading…</p>}
@@ -52,9 +56,24 @@ const AdminHome = () => {
         ))}
       </div>
       <section className="rounded-2xl border iq-line iq-surface p-5">
+        <h3 className="font-semibold">Live class</h3>
+        {live.length === 0 && <p className="mt-2 text-sm iq-muted">No class is live.</p>}
+        <ul className="mt-3 space-y-2 text-sm">
+          {live.map((session) => (
+            <li key={session.id} className="flex items-center justify-between gap-3">
+              <span>{session.topic}</span>
+              <button type="button" className="iq-link" onClick={async () => {
+                await axios.post(`${API_BASE_URL}/live/end/${session.id}`, {}, { headers: authHeaders() });
+                setLive((rows) => rows.filter((row) => row.id !== session.id));
+              }}>End</button>
+            </li>
+          ))}
+        </ul>
+      </section>
+      <section className="rounded-2xl border iq-line iq-surface p-5">
         <h3 className="font-semibold">What students see</h3>
         <ul className="mt-3 space-y-2 text-sm iq-muted">
-          <li>Published courses appear in a student account after enrolment.</li>
+          <li>A published course is added to every student account. Hiding it removes it from learner lists.</li>
           <li>Watch lessons stay on IQNex. Students open their courses after they sign in.</li>
           <li>A certificate can be downloaded after the course assessments are submitted.</li>
         </ul>

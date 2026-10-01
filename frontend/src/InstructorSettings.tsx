@@ -3,6 +3,7 @@ import axios from "axios";
 import { Lock, Save, CheckCircle, AlertCircle, X } from "lucide-react"; // ✅ Added Icons
 import API_BASE_URL from './config';
 const InstructorSettings = () => {
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -32,21 +33,21 @@ const InstructorSettings = () => {
     e.preventDefault();
     
     // ✅ Replaced Alert
-    if (newPassword.length < 6) {
-        triggerToast("Password is too short (min 6 chars)", "error");
+    if (newPassword.length < 8) {
+        triggerToast("Password is too short (min 8 chars)", "error");
         return;
     }
 
     setSaving(true);
     try {
       const token = localStorage.getItem("token");
-     await axios.post(`${API_BASE_URL}/user/change-password`, { new_password: newPassword }, { headers: { Authorization: `Bearer ${token}` } });     
-      // ✅ Replaced Alert
+     await axios.post(`${API_BASE_URL}/user/change-password`, { current_password: currentPassword, new_password: newPassword }, { headers: { Authorization: `Bearer ${token}` } });     
       triggerToast("Password updated successfully!", "success");
+      setCurrentPassword("");
       setNewPassword("");
-    } catch (err) { 
-        // ✅ Replaced Alert
-        triggerToast("Failed to update password. Please try again.", "error"); 
+    } catch (err: unknown) { 
+        const detail = axios.isAxiosError(err) ? err.response?.data?.detail : "";
+        triggerToast(typeof detail === "string" ? detail : "Failed to update password. Please try again.", "error"); 
     } finally { 
         setSaving(false); 
     }
@@ -68,9 +69,19 @@ const InstructorSettings = () => {
 
             <form onSubmit={handlePasswordChange}>
                 <div style={{ marginBottom: "24px" }}>
+                    <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: brand.textMain, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Current Password</label>
+                    <input 
+                        type="password" required minLength={1} 
+                        value={currentPassword} 
+                        onChange={(e) => setCurrentPassword(e.target.value)} 
+                        placeholder="Enter your current password" 
+                        style={{ width: "100%", padding: "14px", borderRadius: "10px", border: `1px solid ${brand.border}`, outline: "none", fontSize: "14px", boxSizing: "border-box", background: "var(--iq-surface)", color: brand.textMain }} 
+                    />
+                </div>
+                <div style={{ marginBottom: "24px" }}>
                     <label style={{ display: "block", fontSize: "12px", fontWeight: "700", color: brand.textMain, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px" }}>New Password</label>
                     <input 
-                        type="password" required minLength={6} 
+                        type="password" required minLength={8} 
                         value={newPassword} 
                         onChange={(e) => setNewPassword(e.target.value)} 
                         placeholder="Enter new strong password" 

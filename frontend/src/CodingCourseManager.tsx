@@ -105,10 +105,10 @@ const CodingCourseManager = () => {
   return (
     <div className="min-h-screen bg-[#F8FAFC] font-sans relative">
       {/* 1. Header Area */}
-      <header className="bg-white border-b border-slate-200 px-8 py-5 flex justify-between items-center sticky top-0 z-10">
+      <header className="bg-white border-b border-slate-200 px-4 py-3 md:px-8 flex flex-wrap justify-between items-center gap-3 sticky top-0 z-10">
         <div className="flex items-center gap-4">
-            <button onClick={() => navigate(-1)} className="p-2 bg-slate-100 hover:bg-slate-200 rounded-full transition-colors text-slate-600">
-                <ArrowLeft size={20} />
+            <button onClick={() => navigate(-1)} className="iq-btn iq-btn-icon shrink-0" aria-label="Back">
+                <ArrowLeft size={16} />
             </button>
             <div>
                 <h1 className="text-xl font-extrabold text-slate-900">{courseTitle || "Coding Course"}</h1>
@@ -116,26 +116,23 @@ const CodingCourseManager = () => {
             </div>
         </div>
         <div className="flex gap-3">
-            <button onClick={() => navigate(`/dashboard/course/${courseId}/builder`)} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-600 font-bold hover:bg-slate-50 transition-colors">
-                <Plus size={16} /> Add New Problem
+            <button onClick={() => navigate(`/dashboard/course/${courseId}/builder`)} className="iq-btn iq-btn-primary">
+                <Plus size={14} /> Add problem
             </button>
         </div>
       </header>
 
       <div className="max-w-5xl mx-auto p-8">
         {/* 2. Tabs */}
-        <div className="flex justify-center gap-4 mb-10">
+        <div className="flex flex-wrap justify-center gap-2 mb-8">
             {["Easy", "Medium", "Hard"].map(tab => (
                 <button 
                     key={tab}
+                    type="button"
                     onClick={() => setActiveTab(tab)}
-                    className={`px-8 py-3 rounded-full font-bold text-sm transition-all shadow-sm ${
-                        activeTab === tab 
-                        ? "bg-[#005EB8] text-white scale-105" 
-                        : "bg-white text-slate-500 hover:bg-slate-50 border border-slate-200"
-                    }`}
+                    className={`iq-btn ${activeTab === tab ? "iq-btn-primary" : "iq-btn-line"}`}
                 >
-                    {tab} Level
+                    {tab}
                 </button>
             ))}
         </div>
@@ -152,7 +149,7 @@ const CodingCourseManager = () => {
                 </div>
             ) : (
                 filteredChallenges.map((c) => (
-                    <div key={c.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow flex justify-between items-center group">
+                    <div key={c.id} className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow flex flex-wrap justify-between items-center gap-3 group">
                         
                         {/* Left: Info */}
                         <div className="flex items-center gap-5">
@@ -172,19 +169,21 @@ const CodingCourseManager = () => {
                         {/* Right: Actions (Using your requested icons) */}
                         <div className="flex items-center gap-3">
                             <button 
+                                type="button"
                                 onClick={() => openEditModal(c)}
-                                className="w-10 h-10 flex items-center justify-center rounded-xl border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors"
+                                className="iq-btn iq-btn-line"
                                 title="Edit Problem"
                             >
-                                <Edit size={18} />
+                                <Edit size={14} /> Edit
                             </button>
 
                             <button 
+                                type="button"
                                 onClick={() => handleDelete(c.id)}
-                                className="w-10 h-10 flex items-center justify-center rounded-xl border border-red-200 text-red-500 hover:bg-red-50 transition-colors"
+                                className="iq-btn iq-btn-danger"
                                 title="Delete Problem"
                             >
-                                <Trash2 size={18} />
+                                <Trash2 size={14} /> Delete
                             </button>
                         </div>
                     </div>
@@ -218,8 +217,8 @@ const CodingCourseManager = () => {
                     </div>
                 </div>
                 <div className="p-5 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
-                    <button onClick={() => setIsEditModalOpen(false)} className="px-6 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-200 transition-colors">Cancel</button>
-                    <button onClick={handleSaveEdit} className="px-6 py-3 rounded-xl font-bold bg-[#005EB8] text-white hover:bg-blue-700 transition-colors shadow-lg shadow-blue-200">Save Changes</button>
+                    <button type="button" onClick={() => setIsEditModalOpen(false)} className="iq-btn iq-btn-line">Cancel</button>
+                    <button type="button" onClick={handleSaveEdit} className="iq-btn iq-btn-primary">Save</button>
                 </div>
             </div>
         </div>

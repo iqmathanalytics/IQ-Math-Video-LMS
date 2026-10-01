@@ -689,10 +689,10 @@ const CourseBuilder = () => {
             <div className="max-w-[1400px] mx-auto bg-slate-200 min-h-screen flex flex-col overflow-x-hidden">
 
                 {/* ✅ HEADER: Matches Standard Builder Style */}
-                <header className="flex justify-between items-center bg-white px-4 py-4 md:px-10 border-b border-slate-200 z-50 sticky top-0">
-                    <div className="flex items-center gap-3 md:gap-5">
-                        <button onClick={() => navigate("/dashboard/courses")} className="bg-slate-200 border-none p-2.5 rounded-full cursor-pointer hover:bg-slate-300 transition-colors">
-                            <ArrowLeft size={20} color={brand.textMain} />
+                <header className="flex flex-wrap justify-between items-center gap-3 bg-white px-4 py-3 md:px-8 border-b border-slate-200 z-10 sticky top-0">
+                    <div className="flex min-w-0 items-center gap-3">
+                        <button onClick={() => navigate("/dashboard/courses")} className="iq-btn iq-btn-icon shrink-0" aria-label="Back to courses">
+                            <ArrowLeft size={16} />
                         </button>
 
                         {/* Title & Edit Icon */}
@@ -706,22 +706,22 @@ const CourseBuilder = () => {
                                 </span>
                             </div>
                             <button
-                                onClick={handleEditCourseClick} // ✅ Triggers the Edit Modal
-                                className="bg-none border-none cursor-pointer p-1 flex items-center hover:bg-slate-100 rounded-full transition-colors"
+                                onClick={handleEditCourseClick}
+                                className="iq-btn iq-btn-icon shrink-0"
                                 title="Edit Course Details"
+                                aria-label="Edit course details"
                             >
-                                <Edit size={18} color={brand.textLight} />
+                                <Edit size={14} />
                             </button>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2 md:gap-3 text-xs md:text-sm">
-                        {/* ✅ Preview Button now works */}
-                        <button onClick={() => navigate(`/dashboard/course/${courseId}/preview`)} className="px-3 py-2 md:px-5 md:py-2.5 bg-white text-[#005EB8] border border-[#005EB8] rounded-lg font-bold hover:bg-blue-50 transition-colors whitespace-nowrap">
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => navigate(`/dashboard/course/${courseId}/preview`)} className="iq-btn iq-btn-line">
                             Preview
                         </button>
-                        <button onClick={handlePublish} disabled={isPublishing} className="px-3 py-2 md:px-6 md:py-2.5 rounded-lg border-none bg-[#87C232] text-white font-extrabold shadow-md hover:bg-[#76a928] transition-all disabled:opacity-50 whitespace-nowrap">
-                            {isPublishing ? "..." : "Publish"}
+                        <button onClick={handlePublish} disabled={isPublishing} className="iq-btn iq-btn-primary">
+                            {isPublishing ? "Publishing…" : "Publish"}
                         </button>
                     </div>
                 </header>
@@ -732,9 +732,8 @@ const CourseBuilder = () => {
                     {/* TABS */}
                     <div className="flex flex-wrap gap-2 md:gap-4 mb-8 justify-center">
                         {["Easy", "Medium", "Hard"].map(tab => (
-                            <button key={tab} onClick={() => { setActiveTab(tab); resetForm(); }}
-                                style={{ padding: "12px 40px", borderRadius: "30px", background: activeTab === tab ? brand.green : "white", color: activeTab === tab ? "white" : "#64748b", fontWeight: "800", border: activeTab === tab ? "none" : "1px solid #cbd5e1", cursor: "pointer", transition: "all 0.2s", boxShadow: "0 4px 6px rgba(0,0,0,0.05)" }}>
-                                {tab} Level
+                            <button key={tab} type="button" onClick={() => { setActiveTab(tab); resetForm(); }} className={`iq-btn ${activeTab === tab ? "iq-btn-primary" : "iq-btn-line"}`}>
+                                {tab}
                             </button>
                         ))}
                     </div>
@@ -746,28 +745,18 @@ const CourseBuilder = () => {
                                 <h3 style={{ fontSize: "18px", fontWeight: "800", color: brand.textMain }}>
                                     {editingId ? "Edit Problem" : "Add New Problem"}
                                 </h3>
-                                {editingId && <button onClick={resetForm} style={{ fontSize: "12px", color: brand.textLight, background: "#f1f5f9", padding: "5px 10px", borderRadius: "6px", border: "none", cursor: "pointer" }}>Cancel Edit</button>}
+                                {editingId && <button type="button" onClick={resetForm} className="iq-btn iq-btn-quiet">Cancel</button>}
                             </div>
 
                             <div style={{ display: "flex", gap: "10px", marginBottom: "15px" }}>
                                 <input value={cTitle} onChange={e => setCTitle(e.target.value)} placeholder="Problem Title (e.g. Fibonacci)" style={{ ...inputStyle, flex: 1 }} />
                                 <button
+                                    type="button"
                                     onClick={handleAutoFill}
                                     disabled={loadingAI}
-                                    style={{
-                                        padding: "0 20px",
-                                        background: loadingAI ? "#cbd5e1" : "#0f172a", // ✅ Black
-                                        color: "white",
-                                        border: "none",
-                                        borderRadius: "10px", // Slightly more rounded
-                                        fontWeight: "700",
-                                        fontSize: "13px",
-                                        cursor: loadingAI ? "wait" : "pointer",
-                                        transition: "all 0.2s",
-                                        display: "flex", alignItems: "center", gap: "8px" // Flex for icon
-                                    }}
+                                    className="iq-btn iq-btn-line shrink-0"
                                 >
-                                    {loadingAI ? "Generating..." : <><Sparkles size={14} /> AI Auto Fill</>} {/* ✅ Icon instead of Emoji */}
+                                    {loadingAI ? "Generating…" : <><Sparkles size={14} /> Auto fill</>}
                                 </button>
                             </div>
                             <textarea rows={5} value={cDesc} onChange={e => setCDesc(e.target.value)} placeholder="Problem Description..." style={{ ...inputStyle, marginBottom: "20px", resize: "vertical" }} />
@@ -785,27 +774,14 @@ const CourseBuilder = () => {
                                         {cTests.length > 1 && <X size={16} color="#ef4444" cursor="pointer" onClick={() => { const n = cTests.filter((_, idx) => idx !== i); setCTests(n); }} />}
                                     </div>
                                 ))}
-                                <button onClick={() => setCTests([...cTests, { input: "", output: "", hidden: false }])} style={{ fontSize: "13px", color: brand.blue, background: "none", border: "none", cursor: "pointer", marginTop: "5px", fontWeight: "700" }}>+ Add Test Case</button>
+                                <button type="button" onClick={() => setCTests([...cTests, { input: "", output: "", hidden: false }])} className="iq-btn iq-btn-quiet mt-1">Add test case</button>
                             </div>
 
-                            <button
-                                onClick={saveChallenge}
-                                style={{
-                                    width: "100%",
-                                    padding: "16px",
-                                    background: editingId ? "#d97706" : "#0f172a", // ✅ Black (Amber for Edit)
-                                    color: "white",
-                                    fontWeight: "800",
-                                    borderRadius: "12px",
-                                    border: "none",
-                                    cursor: "pointer",
-                                    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
-                                    marginTop: "10px",
-                                    fontSize: "15px"
-                                }}
-                            >
-                                {editingId ? "Update Problem" : `Save Problem to ${activeTab}`}
+                            <div className="mt-3 flex justify-end">
+                            <button type="button" onClick={saveChallenge} className="iq-btn iq-btn-primary">
+                                {editingId ? "Update problem" : `Save to ${activeTab}`}
                             </button>
+                            </div>
                         </div>
 
                         {/* RIGHT: LIST (With Edit/Delete Features) */}
@@ -921,10 +897,10 @@ const CourseBuilder = () => {
     return (
         <div className="max-w-[1400px] mx-auto bg-slate-200 min-h-screen flex flex-col overflow-x-hidden">
             {/* Header stays fixed at the top naturally because of flex column */}
-            <header className="flex justify-between rounded-2xl items-center bg-white px-4 py-4 md:px-10 border-b border-slate-200 z-50 sticky top-0">
-                <div className="flex items-center gap-3 md:gap-5">
-                    <button onClick={() => navigate("/dashboard/courses")} className="bg-slate-200 border-none p-2.5 rounded-full cursor-pointer hover:bg-slate-300 transition-colors">
-                        <ArrowLeft size={20} color={brand.textMain} />
+            <header className="flex flex-wrap justify-between items-center gap-3 rounded-2xl bg-white px-4 py-3 md:px-8 border-b border-slate-200 z-10 sticky top-0">
+                <div className="flex min-w-0 items-center gap-3">
+                    <button onClick={() => navigate("/dashboard/courses")} className="iq-btn iq-btn-icon shrink-0" aria-label="Back to courses">
+                        <ArrowLeft size={16} />
                     </button>
 
                     {/* ✅ UPDATED: Dynamic Title & Edit Button */}
@@ -934,27 +910,28 @@ const CourseBuilder = () => {
                         </h2>
                         <button
                             onClick={handleEditCourseClick}
-                            className="bg-none border-none cursor-pointer p-1 flex items-center hover:bg-slate-100 rounded-full transition-colors"
+                            className="iq-btn iq-btn-icon shrink-0"
                             title="Edit Course Details"
+                            aria-label="Edit course details"
                         >
-                            <Edit size={18} color={brand.textLight} style={{ transition: "color 0.2s" }} />
+                            <Edit size={14} />
                         </button>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2 md:gap-3">
+                <div className="flex items-center gap-2">
                     <button
                         onClick={() => navigate(`/dashboard/course/${courseId}/CoursePreview`)}
-                        className="px-3 py-2 md:px-5 md:py-2.5 bg-white text-[#005EB8] border border-[#005EB8] rounded-lg font-bold hover:bg-blue-50 transition-colors whitespace-nowrap text-xs md:text-sm"
+                        className="iq-btn iq-btn-line"
                     >
                         Preview
                     </button>
                     <button
                         onClick={handlePublish}
                         disabled={isPublishing}
-                        className="px-3 py-2 md:px-6 md:py-2.5 rounded-lg border-none bg-[#87C232] text-white font-extrabold shadow-md hover:bg-[#76a928] transition-all disabled:opacity-50 whitespace-nowrap text-xs md:text-sm"
+                        className="iq-btn iq-btn-primary"
                     >
-                        {isPublishing ? "Publishing..." : "Publish Course"}
+                        {isPublishing ? "Publishing…" : "Publish"}
                     </button>
                 </div>
             </header>
@@ -972,7 +949,7 @@ const CourseBuilder = () => {
                 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
                         <h3 style={{ fontSize: "16px", fontWeight: "800" }}>Curriculum</h3>
-                        <button onClick={() => setActiveModal("Heading")} style={{ color: brand.blue, background: "none", border: "none", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>+ New Heading</button>
+                        <button type="button" onClick={() => setActiveModal("Heading")} className="iq-btn iq-btn-quiet">New heading</button>
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                         {modules.map((m) => (
@@ -1004,12 +981,12 @@ const CourseBuilder = () => {
                             <div style={{ marginTop: "10px", padding: "15px", background: "#f1f5f9", borderRadius: "12px" }}>
                                 <input autoFocus placeholder="Module Name..." value={newModuleTitle} onChange={(e) => setNewModuleTitle(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: `1px solid ${brand.border}`, marginBottom: "10px", outline: "none" }} />
                                 <div style={{ display: "flex", gap: "8px" }}>
-                                    <button onClick={handleAddModule} style={{ flex: 1, background: brand.blue, color: "white", border: "none", padding: "10px", borderRadius: "8px", fontWeight: "700" }}>Add</button>
-                                    <button onClick={() => setShowAddModule(false)} style={{ flex: 1, background: "var(--iq-surface)", border: `1px solid ${brand.border}`, padding: "10px", borderRadius: "8px" }}>Cancel</button>
+                                    <button type="button" onClick={handleAddModule} className="iq-btn iq-btn-primary" style={{ flex: 1 }}>Add</button>
+                                    <button type="button" onClick={() => setShowAddModule(false)} className="iq-btn iq-btn-line" style={{ flex: 1 }}>Cancel</button>
                                 </div>
                             </div>
                         ) : (
-                            <button onClick={() => setShowAddModule(true)} style={{ width: "100%", padding: "14px", borderRadius: "12px", border: `2px dashed ${brand.border}`, color: brand.textLight, background: "none", fontWeight: "700", cursor: "pointer", marginTop: "10px" }}>+ Add Module</button>
+                            <button type="button" onClick={() => setShowAddModule(true)} className="iq-btn iq-btn-line iq-btn-block" style={{ marginTop: "10px", borderStyle: "dashed" }}>Add module</button>
                         )}
                     </div>
                 </aside >
@@ -1066,9 +1043,10 @@ const CourseBuilder = () => {
                                     setLibraryMode("items");
                                     setIsSourceCourseDropdownOpen(false);
                                 }}
-                                style={{ border: "none", background: libraryMode === "items" ? brand.blue : "#e2e8f0", color: libraryMode === "items" ? "white" : brand.textMain, padding: "10px 14px", borderRadius: "10px", fontWeight: 700, cursor: selectedModuleId ? "pointer" : "not-allowed", opacity: selectedModuleId ? 1 : 0.6 }}
+                                className={`iq-btn ${libraryMode === "items" ? "iq-btn-primary" : "iq-btn-quiet"}`}
+                                style={{ opacity: selectedModuleId ? 1 : 0.6 }}
                             >
-                                Items Library
+                                Item library
                             </button>
                             <button
                                 type="button"
@@ -1077,9 +1055,9 @@ const CourseBuilder = () => {
                                     setIsTypeDropdownOpen(false);
                                     setIsCourseDropdownOpen(false);
                                 }}
-                                style={{ border: "none", background: libraryMode === "modules" ? brand.blue : "#e2e8f0", color: libraryMode === "modules" ? "white" : brand.textMain, padding: "10px 14px", borderRadius: "10px", fontWeight: 700, cursor: "pointer" }}
+                                className={`iq-btn ${libraryMode === "modules" ? "iq-btn-primary" : "iq-btn-quiet"}`}
                             >
-                                Import Modules
+                                Import modules
                             </button>
                         </div>
 
@@ -1715,6 +1693,6 @@ const modalOverlay = { position: "fixed" as const, top: 0, left: 0, right: 0, bo
 const modalContent = { background: "var(--iq-surface)", color: "var(--iq-text)", width: "100%", maxWidth: "600px", padding: "40px", borderRadius: "24px", border: "1px solid var(--iq-border)" };
 const labelStyle = { display: "block", marginBottom: "8px", fontSize: "12px", fontWeight: "800", color: "var(--iq-text)", textTransform: "uppercase" as const, letterSpacing: "0.5px" };
 const inputStyle = { width: "100%", padding: "14px", borderRadius: "12px", border: "1.5px solid var(--iq-border)", fontSize: "15px", outline: "none", boxSizing: "border-box" as const, background: "var(--iq-bg)", color: "var(--iq-text)" };
-const saveButton = { width: "100%", padding: "16px", marginTop: "32px", background: "var(--iq-accent)", color: "var(--iq-accent-ink)", border: "none", borderRadius: "14px", fontSize: "16px", fontWeight: "800", cursor: "pointer" };
+const saveButton = { display: "inline-flex", alignItems: "center", justifyContent: "center", height: "32px", marginTop: "16px", padding: "0 14px", background: "var(--iq-accent)", color: "var(--iq-accent-ink)", border: "none", borderRadius: "999px", fontSize: "13px", fontWeight: "600", cursor: "pointer" };
 
 export default CourseBuilder;

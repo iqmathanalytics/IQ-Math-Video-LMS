@@ -1,18 +1,18 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import Editor from "@monaco-editor/react";
-import Plyr from "plyr-react";
-import "plyr/dist/plyr.css";
 import API_BASE_URL from './config';
 import { runTestCasesLocally } from './utils/pyodideEnv';
 import {
     PlayCircle, FileText, ChevronLeft, Menu, Code, HelpCircle,
     UploadCloud, Play, Save, Monitor, Cpu, ChevronDown, ChevronRight, CreditCard,
     File as FileIcon, X, CheckCircle, Radio, Lock, ArrowLeft, AlertCircle, Clock,
-    Zap, CheckSquare, Square, CheckCheck, Award, Edit, AlertTriangle, Maximize, Minimize, LockKeyhole, Cloud, Link as ResourceLinkIcon // <--- Added 'Cloud' icon here
+    Zap, CheckSquare, Square, CheckCheck, Award, Edit, AlertTriangle, LockKeyhole, Cloud, Link as ResourceLinkIcon // <--- Added 'Cloud' icon here
 } from "lucide-react";
 import { CODE_TEMPLATES } from './utils/codeTemplates';
+import { withPaymentMethods } from './utils/razorpay';
+import { youtubeIdFromLink } from './utils/youtube';
 
 
 
@@ -348,16 +348,8 @@ const CodingPlayer = ({ course, token }: { course: any, token: string }) => {
         return true;
     };
 
-    const handleClaimCertificate = async () => {
-        try {
-            const res = await axios.post(`${API_BASE_URL}/courses/${courseId}/claim-certificate`, {}, { headers: { Authorization: `Bearer ${token}` } });
-            if (res.data.status === "success") {
-                triggerToast("🎉 Certificate Generated!", "success");
-                setTimeout(() => navigate("/student-dashboard"), 2000);
-            } else {
-                triggerToast(res.data.message, "error");
-            }
-        } catch (e) { triggerToast("Failed to claim certificate", "error"); }
+    const handleClaimCertificate = () => {
+        navigate(`/my-courses/${courseId}/assessments`);
     };
 
     // 🟢 HANDLE RUN CODE (Dry Run)
@@ -461,7 +453,8 @@ const CodingPlayer = ({ course, token }: { course: any, token: string }) => {
             const res = await axios.post(`${API_BASE_URL}/execute`, {
                 source_code: code,
                 language_id: langId,
-                test_cases: cases
+                test_cases: [],
+                challenge_id: selectedProblem.id,
             }, { headers: { Authorization: `Bearer ${token}` } });
 
             let report = res.data;
@@ -666,158 +659,28 @@ const CodingPlayer = ({ course, token }: { course: any, token: string }) => {
         </div>
     )
 };
-// --- ⏳ DELAYED PLAYER COMPONENT (Fixes the crash) ---
-const DelayedVideoPlayer = ({ lesson, plyrOptions }: { lesson: any, plyrOptions: any }) => {
-    const [isReady, setIsReady] = useState(false);
-    const [isFullscreen, setIsFullscreen] = useState(false);
-
-    // 1️⃣ REFS: One for API, One for the Super Container
-    const plyrRef = useRef<any>(null);
-    const containerRef = useRef<HTMLDivElement>(null);
-    const plyrSourceRef = useRef<any>(null);
-
-    const getYoutubeId = (url: string) => {
-        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-        const match = url.match(regExp);
-        return (match && match[2].length === 11) ? match[2] : null;
-    };
-
-    const getDriveEmbedUrl = (url: string) => {
-        if (!url) return null;
-        if (url.includes("drive.google.com")) {
-            // Convert /view or /edit to /preview for embedding
-            return url.replace(/\/view.*/, "/preview").replace(/\/edit.*/, "/preview");
-        }
-        return null;
-    };
-
-    useEffect(() => {
-        setIsReady(false);
-        const timer = setTimeout(() => setIsReady(true), 1000);
-        return () => clearTimeout(timer);
-    }, [lesson.id]);
-
-    // 2️⃣ CUSTOM FULLSCREEN TOGGLE
-    const toggleFullScreen = () => {
-        if (!containerRef.current) return;
-
-        if (!document.fullscreenElement) {
-            containerRef.current.requestFullscreen().then(() => setIsFullscreen(true)).catch(err => console.error("Fullscreen failed", err));
-        } else {
-            document.exitFullscreen().then(() => setIsFullscreen(false));
-        }
-    };
-
-    // 3️⃣ HIDE DEFAULT FULLSCREEN BUTTON (So users use ours)
-    // We override the passed options to remove 'fullscreen' from controls
-    const customOptions = useMemo(() => ({
-        ...plyrOptions,
-        controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume'], // ❌ Removed 'fullscreen'
-    }), [plyrOptions]);
-
-    const videoId = getYoutubeId(lesson.url || "");
-    const driveUrl = getDriveEmbedUrl(lesson.url || "");
-
-    useEffect(() => {
-        plyrSourceRef.current = videoId
-            ? { type: "video" as const, sources: [{ src: videoId, provider: "youtube" as const }] }
-            : null;
-    }, [lesson.id, videoId]);
-
-    if (!videoId && !driveUrl) return <div className="text-white p-10">Invalid Video URL</div>;
-
-    if (!isReady) {
-        return (
-            <div className="w-full h-full flex flex-col items-center justify-center bg-black">
-                <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                <p className="text-white text-sm font-bold animate-pulse">LOADING NEXT LESSON...</p>
-            </div>
-        );
-    }
-
+const LessonVideo = ({ lesson }: { lesson: any }) => {
+    const raw = String(lesson.url || "");
+    const videoId = youtubeIdFromLink(raw);
+    const drive = raw.match(/drive\.google\.com\/file\/d\/([\w-]+)/);
+    const src = videoId
+        ? `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`
+        : drive
+            ? `https://drive.google.com/file/d/${drive[1]}/preview`
+            : raw.includes("drive.google.com")
+                ? raw.replace(/\/view.*/, "/preview").replace(/\/edit.*/, "/preview")
+                : "";
+    if (!src) return <div className="p-10 text-center text-white">This lesson has no playable video.</div>;
     return (
-        <div style={{ width: "100%", height: "100%", background: "black", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            {/* 4️⃣ SUPER CONTAINER: This goes fullscreen, carrying everything inside */}
-            <div
-                ref={containerRef}
-                className="group relative"
-                style={{
-                    width: isFullscreen ? "100vw" : "100%",
-                    height: isFullscreen ? "100vh" : "auto",
-                    maxWidth: isFullscreen ? "none" : "1000px",
-                    borderRadius: isFullscreen ? "0" : "12px",
-                    overflow: "hidden",
-                    boxShadow: "0 20px 50px rgba(0,0,0,0.5)",
-                    background: "black",
-                    display: "flex", // Centers video in fullscreen
-                    alignItems: "center",
-                    justifyContent: "center"
-                }}
-            >
-                <style>{`
-                    .plyr__video-embed iframe { top: -50%; height: 200%; } 
-                    :root { --plyr-color-main: #005EB8; }
-                    /* Hide YouTube Title/Avatar */
-                    .plyr__video-embed iframe { pointer-events: none; }
-                `}</style>
-
-                {/* Wrapper allows styling the player size properly within flex container */}
-                <div style={{ width: "100%", height: "100%" }}>
-                    {videoId && (
-                        <Plyr
-                            ref={plyrRef}
-                            key={lesson.id}
-                            source={plyrSourceRef.current}
-                            options={customOptions} // ✅ Uses options WITHOUT default fullscreen button
-                        />
-                    )}
-                    {driveUrl && (
-                        <iframe
-                            src={driveUrl}
-                            width="100%"
-                            height="100%"
-                            style={{ border: "none", minHeight: isFullscreen ? "100vh" : "500px" }}
-                            allow="autoplay"
-                            allowFullScreen
-                        />
-                    )}
-                </div>
-
-                {/* 🛡️ INTERCEPTOR SHIELD (Still works in Fullscreen!) */}
-                <div
-                    style={{
-                        position: "absolute",
-                        top: 0,
-                        left: 0,
-                        width: "100%",
-                        height: "85%", // Covers top 85%
-                        zIndex: 50,
-                        cursor: "pointer",
-                        background: "transparent",
-                        touchAction: "manipulation"
-                    }}
-                    onClick={() => {
-                        if (videoId && plyrRef.current?.plyr) {
-                            plyrRef.current.plyr.togglePlay();
-                        }
-                        // For Drive, we can't toggle play via JS easily on an iframe, so this shield mainly prevents pop-outs.
-                    }}
-                    onDoubleClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        console.log("🛡️ Blocked Double Tap");
-                    }}
-                />
-
-                {/* 5️⃣ CUSTOM FULLSCREEN BUTTON (Floating Overlay) */}
-                <button
-                    onClick={toggleFullScreen}
-                    className="absolute bottom-16 right-6 z-[60] bg-black/60 text-white p-2 rounded-lg hover:bg-blue-600 transition-colors opacity-0 group-hover:opacity-100 duration-300"
-                    title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
-                >
-                    {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
-                </button>
-            </div>
+        <div className="aspect-video w-full bg-black">
+            <iframe
+                key={src}
+                className="h-full w-full"
+                src={src}
+                title={lesson.title || "Lesson"}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+            />
         </div>
     );
 };
@@ -1085,16 +948,21 @@ const LiveTestProctor = ({ lesson }: { lesson: any }) => {
 // --- MAIN PLAYER COMPONENT (UNTOUCHED) ---
 const CoursePlayer = () => {
     const { courseId } = useParams();
+    const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const [course, setCourse] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [activeLesson, setActiveLesson] = useState<any>(null);
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [expandedModules, setExpandedModules] = useState<number[]>([]);
-    const [isTransitioning, setIsTransitioning] = useState(false);
     const [assignmentFile, setAssignmentFile] = useState<File | null>(null);
     const [uploading, setUploading] = useState(false);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
+    const [notesOpen, setNotesOpen] = useState(true);
+    const [lessonNote, setLessonNote] = useState("");
+    const [noteState, setNoteState] = useState("");
+    const [noteLessonId, setNoteLessonId] = useState<number | null>(null);
+    const savedNote = useRef("");
     const [isEditing, setIsEditing] = useState(false);
     const [editForm, setEditForm] = useState({ title: "", description: "", price: 0, image_url: "", language: "" });
 
@@ -1154,11 +1022,11 @@ const CoursePlayer = () => {
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
-            const options = {
+            const options = withPaymentMethods({
                 key: razorpayKey,
                 amount: data.amount,
                 currency: "INR",
-                name: "iQmath Pro",
+                name: "IQNex",
                 description: "Lifetime Course Access",
                 order_id: data.id,
                 handler: async function (response: any) {
@@ -1179,8 +1047,8 @@ const CoursePlayer = () => {
                         triggerToast(getErrorMessage(enrollErr, "Payment succeeded, but unlock failed. Contact support."), "error");
                     }
                 },
-                theme: { color: "#87C232" }
-            };
+                theme: { color: "#1d7a34" },
+            });
             const rzp1 = new (window as any).Razorpay(options);
             rzp1.open();
         } catch (error: any) {
@@ -1195,11 +1063,21 @@ const CoursePlayer = () => {
                 const token = localStorage.getItem("token");
                 const res = await axios.get(`${API_BASE_URL}/courses/${courseId}/player`, { headers: { Authorization: `Bearer ${token}` } });
                 setCourse(res.data);
-
-                if (res.data.modules?.[0] && !activeLesson) {
-                    setExpandedModules([res.data.modules[0].id]);
-                    if (res.data.modules[0].lessons?.length > 0) setActiveLesson(res.data.modules[0].lessons[0]);
+                const requested = searchParams.get("lesson");
+                const modules = res.data.modules || [];
+                let picked = null;
+                let pickedModule = modules[0];
+                for (const module of modules) {
+                    const match = (module.lessons || []).find((lesson: { id: number }) => String(lesson.id) === String(requested));
+                    if (match) {
+                        picked = match;
+                        pickedModule = module;
+                        break;
+                    }
                 }
+                if (pickedModule) setExpandedModules([pickedModule.id]);
+                const first = picked || pickedModule?.lessons?.[0];
+                if (first && !activeLesson) setActiveLesson(first);
             } catch (err: any) {
                 console.error(err);
 
@@ -1222,12 +1100,36 @@ const CoursePlayer = () => {
     }, [courseId, refreshTrigger]);
 
     useEffect(() => {
-        if (activeLesson) {
-            setIsTransitioning(true);
-            const timer = setTimeout(() => { setIsTransitioning(false); }, 500);
-            return () => clearTimeout(timer);
-        }
-    }, [activeLesson?.id]);
+        if (!activeLesson?.id || !courseId) return;
+        const token = localStorage.getItem("token");
+        axios.get(`${API_BASE_URL}/courses/${courseId}/notes`, { headers: { Authorization: `Bearer ${token}` } })
+            .then((res) => {
+                const rows = Array.isArray(res.data) ? res.data : [];
+                const found = rows.find((row: { lesson_id: number; body?: string }) => String(row.lesson_id) === String(activeLesson.id));
+                const body = found?.body || "";
+                savedNote.current = body;
+                setLessonNote(body);
+                setNoteLessonId(activeLesson.id);
+                setNoteState(found?.body ? "Saved" : "");
+            })
+            .catch(() => setNoteState("Notes could not be loaded"));
+    }, [activeLesson?.id, courseId]);
+
+    useEffect(() => {
+        if (!activeLesson?.id || noteLessonId !== activeLesson.id) return;
+        if (lessonNote === savedNote.current) return;
+        setNoteState("Saving…");
+        const timer = window.setTimeout(() => {
+            const token = localStorage.getItem("token");
+            axios.put(`${API_BASE_URL}/courses/${courseId}/notes/${activeLesson.id}`, { body: lessonNote }, { headers: { Authorization: `Bearer ${token}` } })
+                .then(() => {
+                    savedNote.current = lessonNote;
+                    setNoteState("Saved on your account");
+                })
+                .catch(() => setNoteState("Not saved"));
+        }, 700);
+        return () => window.clearTimeout(timer);
+    }, [lessonNote, noteLessonId, activeLesson?.id, courseId]);
 
     const toggleModule = (moduleId: number) => setExpandedModules(prev => prev.includes(moduleId) ? prev.filter(id => id !== moduleId) : [...prev, moduleId]);
 
@@ -1267,11 +1169,6 @@ const CoursePlayer = () => {
         return [];
     };
 
-    const plyrOptions = useMemo(() => ({
-        controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'fullscreen'],
-        youtube: { noCookie: true, rel: 0, showinfo: 0, iv_load_policy: 3, modestbranding: 1 },
-    }), []);
-
     const handleAssignmentUpload = async () => {
         if (!assignmentFile) return;
         setUploading(true);
@@ -1295,30 +1192,22 @@ const CoursePlayer = () => {
         try {
             const token = localStorage.getItem("token");
             await axios.post(`${API_BASE_URL}/content/${lesson.id}/complete`, {}, { headers: { Authorization: `Bearer ${token}` } });
-            triggerToast(lesson.is_completed ? "Marked as Incomplete" : "Marked as Complete!", "success");
+            triggerToast("Marked as complete", "success");
             setRefreshTrigger(prev => prev + 1);
         } catch (err) { triggerToast("Failed to update status", "error"); }
     };
 
-    const handleClaimCertificate = async () => {
-        try {
-            const token = localStorage.getItem("token");
-            const res = await axios.post(`${API_BASE_URL}/courses/${courseId}/claim-certificate`, {}, { headers: { Authorization: `Bearer ${token}` } });
-            if (res.data.status === "success") {
-                triggerToast("🎉 Certificate Generated Successfully!", "success");
-                setTimeout(() => navigate("/student-dashboard"), 2000);
-            } else { triggerToast(res.data.message || "Course not yet complete.", "error"); }
-        } catch (err) { triggerToast("Failed to claim certificate.", "error"); }
+    const handleClaimCertificate = () => {
+        navigate(`/my-courses/${courseId}/assessments`);
     };
 
     const isCourseFullyComplete = useMemo(() => {
         if (!course) return false;
-        return course.modules.every((m: any) => m.lessons.every((l: any) => l.is_completed));
+        return course.modules.every((m: any) => (m.lessons || []).every((l: any) => l.is_completed));
     }, [course]);
 
     const renderContent = () => {
         if (!activeLesson) return <div className="text-white p-10 text-center">Select a lesson</div>;
-        if (isTransitioning) return <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 text-white gap-4"><div className="w-10 h-10 border-4 border-[#005EB8] border-t-transparent rounded-full animate-spin"></div><p className="text-sm font-bold tracking-wider animate-pulse text-slate-400">LOADING...</p></div>;
 
         const completionHeader = (
             <div className="bg-slate-50 border-b border-slate-200 p-4 flex justify-between items-center">
@@ -1340,7 +1229,7 @@ const CoursePlayer = () => {
             contentBody = (
                 <div className="h-full overflow-y-auto bg-slate-100 p-4 lg:p-6">
                     <div className="max-w-5xl mx-auto bg-black rounded-xl overflow-hidden shadow-xl">
-                        <DelayedVideoPlayer key={activeLesson.id} lesson={activeLesson} plyrOptions={plyrOptions} />
+                        <LessonVideo key={activeLesson.id} lesson={activeLesson} />
                     </div>
                     {resourceLinks.length > 0 && (
                         <div className="max-w-5xl mx-auto mt-4 bg-white border border-slate-200 rounded-xl p-4">
@@ -1498,11 +1387,28 @@ const CoursePlayer = () => {
                     </div>
                     <div className="flex items-center gap-2 lg:gap-4">
                         {localStorage.getItem("role") === "instructor" && (<button onClick={handleEditClick} className="hidden lg:flex items-center gap-2 bg-slate-100 text-slate-700 px-3 py-2 rounded-lg font-bold border border-slate-200 hover:bg-slate-200 transition-colors text-sm"><Edit size={16} /> Edit Course</button>)}
-                        <button onClick={handlePayment} className="hidden sm:flex items-center gap-2 bg-[#87C232] text-white px-4 py-2 rounded-lg font-bold border-none cursor-pointer hover:bg-[#76a82b] transition-colors text-xs lg:text-sm"><CreditCard size={18} /> Buy Lifetime Access</button>
+                        {Number(course?.price) > 0 && course?.enrollment_type !== "paid" && <button onClick={handlePayment} className="hidden sm:flex items-center gap-2 bg-[#87C232] text-white px-4 py-2 rounded-lg font-bold border-none cursor-pointer hover:bg-[#76a82b] transition-colors text-xs lg:text-sm"><CreditCard size={18} /> Buy access</button>}
+                        <button onClick={() => setNotesOpen((open) => !open)} className="flex items-center gap-2 bg-slate-100 text-slate-700 px-3 py-2 rounded-lg font-bold border border-slate-200 text-xs lg:text-sm">{notesOpen ? "Hide notes" : "Notes"}</button>
                         <button onClick={() => setSidebarOpen(!sidebarOpen)} className="bg-none border-none cursor-pointer p-2 hover:bg-slate-100 rounded-lg"><Menu color={brand.textMain} size={24} /></button>
                     </div>
                 </header>
-                <div className="flex-1 bg-white relative overflow-hidden">{renderContent()}</div>
+                <div className={`flex-1 flex min-h-0 bg-white overflow-hidden ${notesOpen ? "flex-col lg:flex-row" : ""}`}>
+                    <div className="min-h-0 min-w-0 flex-1 overflow-hidden">{renderContent()}</div>
+                    {notesOpen && activeLesson && (
+                        <aside className="flex h-56 shrink-0 flex-col border-t border-slate-200 bg-white p-4 lg:h-auto lg:w-80 lg:border-l lg:border-t-0">
+                            <div className="flex items-center justify-between gap-3">
+                                <h2 className="text-sm font-bold text-slate-900">Notes</h2>
+                                <span className="text-xs text-slate-400">{noteState}</span>
+                            </div>
+                            <textarea
+                                value={lessonNote}
+                                onChange={(event) => setLessonNote(event.target.value)}
+                                placeholder="Write what you want to remember from this lesson."
+                                className="mt-3 min-h-0 flex-1 resize-none rounded-xl border border-slate-200 p-3 text-sm text-slate-800"
+                            />
+                        </aside>
+                    )}
+                </div>
             </div>
 
             {/* SIDEBAR - Responsive Overlay on Mobile, Fixed Width on Desktop */}
@@ -1518,7 +1424,8 @@ const CoursePlayer = () => {
 
                     <div className="flex-1 overflow-y-auto p-0">
                         {course?.modules.map((module: any, idx: number) => {
-                            const isModuleComplete = module.lessons.length > 0 && module.lessons.every((l: any) => l.is_completed);
+                            const lessons = module.lessons || [];
+                            const isModuleComplete = lessons.length > 0 && lessons.every((l: any) => l.is_completed);
                             return (
                                 <div key={module.id} className="border-b border-slate-100">
                                     <div onClick={() => toggleModule(module.id)} className={`p-4 cursor-pointer flex justify-between items-center transition-colors ${isModuleComplete ? "bg-blue-50/50" : "bg-slate-50 hover:bg-slate-100"}`}>
@@ -1530,7 +1437,8 @@ const CoursePlayer = () => {
                                     </div>
                                     {expandedModules.includes(module.id) && (
                                         <div className="animate-fade-in">
-                                            {module.lessons.map((lesson: any) => {
+                                            {lessons.map((lesson: any) => {
+                                                const kind = String(lesson.type || "");
                                                 const isActive = activeLesson?.id === lesson.id;
                                                 return (
                                                     <div
@@ -1541,12 +1449,12 @@ const CoursePlayer = () => {
                                                         <div className={isActive ? "text-blue-600" : "text-slate-400"}>
                                                             {lesson.is_completed ? (<CheckCircle size={16} className="text-[#87C232]" fill="#ecfccb" />) : (
                                                                 <>
-                                                                    {lesson.type.includes("video") && <PlayCircle size={16} />}
-                                                                    {lesson.type === "note" && <FileText size={16} />}
-                                                                    {lesson.type === "quiz" && <HelpCircle size={16} />}
-                                                                    {lesson.type.includes("code") && <Code size={16} />}
-                                                                    {lesson.type === "assignment" && <UploadCloud size={16} />}
-                                                                    {lesson.type === "live_class" && <Radio size={16} />}
+                                                                    {kind.includes("video") && <PlayCircle size={16} />}
+                                                                    {kind === "note" && <FileText size={16} />}
+                                                                    {kind === "quiz" && <HelpCircle size={16} />}
+                                                                    {kind.includes("code") && <Code size={16} />}
+                                                                    {kind === "assignment" && <UploadCloud size={16} />}
+                                                                    {kind === "live_class" && <Radio size={16} />}
                                                                 </>
                                                             )}
                                                         </div>
@@ -1569,8 +1477,9 @@ const CoursePlayer = () => {
                             className={`w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${isCourseFullyComplete ? "bg-[#005EB8] text-white shadow-lg shadow-blue-200 hover:scale-105 cursor-pointer" : "bg-slate-200 text-slate-400 cursor-not-allowed"}`}
                         >
                             <Award size={20} />
-                            {isCourseFullyComplete ? "Claim Certificate" : "Complete All Modules"}
+                            {isCourseFullyComplete ? "Claim certificate" : "Complete all lessons"}
                         </button>
+                        <p className="mt-2 text-center text-[11px] text-slate-500">This opens the course assessment. The certificate follows that submission.</p>
                     </div>
                 </aside>
             )}

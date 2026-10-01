@@ -5,6 +5,7 @@ import API_BASE_URL from "../config";
 import { getValidSession } from "../utils/session";
 import CourseFacts from "../components/CourseFacts";
 import CourseCover from "../components/CourseCover";
+import { razorpayKeyId, withPaymentMethods } from "../utils/razorpay";
 
 const headers = () => {
   const session = getValidSession();
@@ -29,24 +30,31 @@ const downloadCertificate = async (courseId: number, title: string) => {
 export const StudentHome = () => {
   const [name, setName] = useState("Student");
   const [courses, setCourses] = useState<Mine[]>([]);
+  const [published, setPublished] = useState<CatalogCourse[]>([]);
   const [notices, setNotices] = useState<Notice[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
 
   useEffect(() => {
+    let cancelled = false;
     Promise.all([
-      axios.get(`${API_BASE_URL}/users/me`, { headers: headers() }),
-      axios.get(`${API_BASE_URL}/my-courses`, { headers: headers() }),
-      axios.get(`${API_BASE_URL}/notifications`, { headers: headers() }).catch(() => ({ data: [] })),
-    ]).then(([me, mine, notes]) => {
-      setName(me.data.full_name || "Student");
-      setCourses(Array.isArray(mine.data) ? mine.data : []);
-      setNotices(Array.isArray(notes.data) ? notes.data : []);
-      setStatus("ready");
-    }).catch(() => setStatus("error"));
+      axios.get(`${API_BASE_URL}/account`, { headers: headers() }),
+      axios.get(`${API_BASE_URL}/courses`, { headers: headers() }),
+    ])
+      .then(([account, catalog]) => {
+        if (cancelled) return;
+        setName(account.data?.user?.full_name || "Student");
+        setCourses(Array.isArray(account.data?.courses) ? account.data.courses : []);
+        setPublished(Array.isArray(catalog.data) ? catalog.data : []);
+        setNotices(Array.isArray(account.data?.notices) ? account.data.notices : []);
+        setStatus("ready");
+      })
+      .catch(() => { if (!cancelled) setStatus("error"); });
+    return () => { cancelled = true; };
   }, []);
 
   const next = courses[0];
   const certificates = courses.filter((course) => course.has_certificate).length;
+  const enrolledIds = new Set(courses.map((course) => course.id));
 
   return (
     <div>
@@ -76,7 +84,23 @@ export const StudentHome = () => {
                 </div>
                 <Link to={`/my-courses/${next.id}`} className="rounded-full iq-accent-bg px-4 py-2 text-sm font-semibold">Open course</Link>
               </div>
-            ) : <p className="mt-3 text-sm iq-muted">You are not enrolled yet. Browse the course catalogue.</p>}
+            ) : <p className="mt-3 text-sm iq-muted">No published course is on your account yet.</p>}
+          </section>
+          <section className="mt-4">
+            <h2 className="text-lg font-semibold">Published courses</h2>
+            {published.length === 0 && <p className="mt-3 text-sm iq-muted">No published courses yet.</p>}
+            <ul className="mt-3 grid gap-4 md:grid-cols-2">
+              {published.map((course) => (
+                <li key={course.id} className="rounded-2xl border iq-line p-4">
+                  <CourseCover title={course.title} imageUrl={course.image_url} />
+                  <h3 className="mt-3 font-semibold">{course.title}</h3>
+                  <p className="mt-1 text-sm iq-muted">{Number(course.price) > 0 ? `₹${course.price}` : "Free"}</p>
+                  {enrolledIds.has(course.id)
+                    ? <Link to={`/my-courses/${course.id}`} className="mt-3 inline-block text-sm iq-link">Continue</Link>
+                    : <Link to="/courses" className="mt-3 inline-block text-sm iq-link">Enrol</Link>}
+                </li>
+              ))}
+            </ul>
           </section>
           <section className="mt-4 rounded-2xl border iq-line p-5">
             <h2 className="text-lg font-semibold">Notices</h2>
@@ -148,21 +172,21 @@ export const CourseCatalog = () => {
         return;
       }
       const loaded = await loadRazorpay();
-      const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID;
-      if (!loaded || !razorpayKey || String(razorpayKey).includes("replace_me")) {
+      const razorpayKey = razorpayKeyId();
+      if (!loaded || !razorpayKey) {
         setMessage("Razorpay checkout is not available. Set VITE_RAZORPAY_KEY_ID and refresh.");
         return;
       }
       const order = await axios.post(`${API_BASE_URL}/create-order`, { course_id: course.id }, { headers: headers() });
       const RazorpayCheckout = (window as Window & { Razorpay: new (options: object) => { open: () => void } }).Razorpay;
-      const checkout = new RazorpayCheckout({
+      const checkout = new RazorpayCheckout(withPaymentMethods({
         key: razorpayKey,
         amount: order.data.amount,
-        currency: order.data.currency,
-        name: "IQ Math",
+        currency: order.data.currency || "INR",
+        name: "IQNex",
         description: course.title,
         order_id: order.data.id,
-        theme: { color: "#005EB8" },
+        theme: { color: "#1d7a34" },
         handler: async (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
           await axios.post(`${API_BASE_URL}/payment/verify`, {
             course_id: course.id,
@@ -172,7 +196,7 @@ export const CourseCatalog = () => {
           }, { headers: headers() });
           markEnrolled(course);
         },
-      });
+      }));
       checkout.open();
       setMessage(`Razorpay checkout is open for ${course.title}.`);
     } catch (err: unknown) {
@@ -203,6 +227,7 @@ export const CourseCatalog = () => {
           <li key={course.id} className="rounded-2xl border iq-line p-5">
             <CourseCover title={course.title} imageUrl={course.image_url} />
             <p className="mt-3 text-xs uppercase tracking-[0.14em] iq-faint">{Number(course.price) > 0 ? `₹${course.price}` : "Free"} · {course.language || course.course_type || "Course"}</p>
+            {Number(course.price) > 0 && !enrolled.has(course.id) && <p className="mt-1 text-xs iq-muted">Pay with UPI, card, netbanking, or a wallet.</p>}
             <h2 className="mt-2 text-xl font-semibold">{course.title}</h2>
             <CourseFacts description={course.description} />
             <div className="mt-4 flex flex-wrap gap-2">
@@ -292,6 +317,7 @@ const isFinished = (course: Mine) => {
 export const ProfilePage = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [courses, setCourses] = useState<Mine[]>([]);
+  const [currentPassword, setCurrentPassword] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -311,11 +337,13 @@ export const ProfilePage = () => {
     event.preventDefault();
     if (password.length < 8) { setMessage("Use at least 8 characters."); return; }
     try {
-      await axios.post(`${API_BASE_URL}/user/change-password`, { new_password: password }, { headers: headers() });
+      await axios.post(`${API_BASE_URL}/user/change-password`, { current_password: currentPassword, new_password: password }, { headers: headers() });
+      setCurrentPassword("");
       setPassword("");
       setMessage("Password updated.");
-    } catch {
-      setMessage("The password could not be updated.");
+    } catch (err: unknown) {
+      const detail = axios.isAxiosError(err) ? err.response?.data?.detail : "";
+      setMessage(typeof detail === "string" ? detail : "The password could not be updated.");
     }
   };
 
@@ -352,6 +380,9 @@ export const ProfilePage = () => {
       )}
       <form onSubmit={save} className="mt-6 max-w-md">
         <h2 className="text-lg font-semibold">Password change</h2>
+        <label className="mt-3 block text-sm">Current password
+          <input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} autoComplete="current-password" className="mt-1 w-full rounded-xl border iq-line iq-surface px-3 py-3" />
+        </label>
         <label className="mt-3 block text-sm">New password
           <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" className="mt-1 w-full rounded-xl border iq-line iq-surface px-3 py-3" />
         </label>

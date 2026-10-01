@@ -24,7 +24,7 @@ class Course(Base):
     __tablename__ = "courses"
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(255))
-    description = Column(String(1000))
+    description = Column(Text)
     price = Column(Integer)
     image_url = Column(String(1000), nullable=True)
     is_published = Column(Boolean, default=False)
@@ -50,7 +50,7 @@ class ContentItem(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(255))
     type = Column(String(64)) 
-    content = Column(String(1000), nullable=True) 
+    content = Column(Text, nullable=True) 
     duration = Column(Integer, nullable=True)
     is_mandatory = Column(Boolean, default=False)
     order = Column(Integer)
@@ -277,3 +277,32 @@ class ProgramRegistration(Base):
     status = Column(String(32), default="registered")
     note = Column(Text, default="")
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class LessonNote(Base):
+    __tablename__ = "lesson_notes"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    content_item_id = Column(Integer, ForeignKey("content_items.id"), index=True)
+    body = Column(Text, default="")
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+class PasswordReset(Base):
+    __tablename__ = "password_resets"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    token_hash = Column(String(128), unique=True, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    used = Column(Boolean, default=False)
+
+class CodeAttempt(Base):
+    """Server record of an official code run. Scores are computed from this, not from the browser."""
+    __tablename__ = "code_attempts"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    code_test_id = Column(Integer, ForeignKey("code_tests.id"), nullable=True, index=True)
+    problem_id = Column(Integer, ForeignKey("problems.id"), nullable=True, index=True)
+    challenge_id = Column(Integer, ForeignKey("course_challenges.id"), nullable=True, index=True)
+    passed = Column(Integer, default=0)
+    total = Column(Integer, default=0)
+    all_passed = Column(Boolean, default=False)
+    updated_at = Column(DateTime, default=datetime.utcnow)

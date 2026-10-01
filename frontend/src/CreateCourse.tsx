@@ -64,9 +64,9 @@ const CreateCourse = () => {
         </div>
         <button
           onClick={() => navigate("/dashboard/courses")}
-          className="self-start md:self-auto flex items-center gap-2 text-[#005EB8] font-bold hover:underline bg-transparent border-none cursor-pointer"
+          className="iq-btn iq-btn-line self-start md:self-auto"
         >
-          <ArrowLeft size={18} strokeWidth={2.5} /> Back to Courses
+          <ArrowLeft size={14} strokeWidth={2.5} /> Courses
         </button>
       </div>
 
@@ -212,20 +212,20 @@ const CreateCourse = () => {
             </div>
           </div>
 
-          <div className="flex flex-col-reverse md:flex-row justify-end gap-3 mt-4 pt-4 border-t border-slate-100">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-2 pt-4 border-t border-slate-100">
             <button
               type="button"
               onClick={() => navigate("/dashboard/courses")}
-              className="px-6 py-3 rounded-xl border border-slate-300 bg-white text-slate-500 font-bold hover:bg-slate-50 transition-colors"
+              className="iq-btn iq-btn-line w-full sm:w-auto"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex items-center justify-center gap-2 px-8 py-3 rounded-xl border-none bg-[#005EB8] text-white font-bold shadow-lg shadow-blue-500/20 hover:bg-[#004e9a] transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+              className="iq-btn iq-btn-primary w-full sm:w-auto"
             >
-              <Save size={18} /> {loading ? "Creating..." : "Create & Build Curriculum"}
+              <Save size={14} /> {loading ? "Creating…" : "Create course"}
             </button>
           </div>
 

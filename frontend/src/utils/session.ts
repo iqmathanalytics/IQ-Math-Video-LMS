@@ -1,7 +1,6 @@
 const TOKEN_KEY = "token";
 const ROLE_KEY = "role";
 const LOGIN_AT_KEY = "login_at";
-const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 1 day
 
 export type SessionData = {
   token: string;
@@ -32,10 +31,22 @@ export const getValidSession = (): SessionData | null => {
     return null;
   }
 
-  if (Date.now() - loginAt > SESSION_TTL_MS) {
+  const expMs = tokenExpiryMs(token);
+  if (!expMs || Date.now() >= expMs) {
     clearSession();
     return null;
   }
 
   return { token, role, loginAt };
+};
+
+const tokenExpiryMs = (token: string) => {
+  try {
+    const part = token.split(".")[1] || "";
+    const padded = part.replace(/-/g, "+").replace(/_/g, "/");
+    const payload = JSON.parse(atob(padded));
+    return typeof payload.exp === "number" ? payload.exp * 1000 : 0;
+  } catch {
+    return 0;
+  }
 };

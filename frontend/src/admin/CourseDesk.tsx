@@ -59,7 +59,7 @@ const CourseDesk = () => {
     try {
       await axios.patch(`${API_BASE_URL}/courses/${course.id}/publish`, { is_published: isPublished }, { headers: headers() });
       setCourses((rows) => rows.map((row) => row.id === course.id ? { ...row, is_published: isPublished } : row));
-      setMessage(isPublished ? `${course.title} is visible to learners.` : `${course.title} is hidden from learners.`);
+      setMessage(isPublished ? `${course.title} is on every student account.` : `${course.title} is hidden from learners.`);
     } catch {
       setMessage("That change was not saved.");
     } finally {
@@ -90,7 +90,7 @@ const CourseDesk = () => {
           <h2 className="mt-1 text-3xl font-semibold" style={{ fontFamily: '"Space Grotesk", Inter, sans-serif' }}>Uploaded courses</h2>
           <p className="mt-2 max-w-2xl text-sm iq-muted">Courses already saved on this site. Open one to edit its modules and YouTube lessons, or publish it so learners can see it.</p>
         </div>
-        <Link to="/dashboard/create-course" className="rounded-full iq-accent-bg px-4 py-2 text-sm font-semibold">Add a course</Link>
+        <Link to="/dashboard/create-course" className="iq-btn iq-btn-primary">Add a course</Link>
       </div>
 
       <div className="mt-5 flex flex-wrap gap-3">
@@ -120,13 +120,13 @@ const CourseDesk = () => {
               {course.is_published ? "Published" : "Hidden"} · {Number(course.price) > 0 ? `₹${course.price}` : "Free"} · {course.modules} modules · {course.lessons} lessons
             </p>
             <h3 className="mt-2 text-xl font-semibold">{course.title}</h3>
-            <div className="mt-4 flex flex-wrap gap-2 text-sm">
-              <Link to={`/dashboard/course/${course.id}/builder`} className="rounded-full iq-accent-bg px-4 py-2 font-semibold">Edit lessons</Link>
-              <Link to={`/dashboard/course/${course.id}/recordings`} className="rounded-full border iq-line px-4 py-2">Recordings</Link>
-              <button type="button" disabled={busyId === course.id} onClick={() => setPublished(course, !course.is_published)} className="rounded-full border iq-line px-4 py-2 disabled:opacity-50">
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <Link to={`/dashboard/course/${course.id}/builder`} className="iq-btn iq-btn-primary w-full">Edit lessons</Link>
+              <Link to={`/dashboard/course/${course.id}/recordings`} className="iq-btn iq-btn-line w-full">Recordings</Link>
+              <button type="button" disabled={busyId === course.id} onClick={() => setPublished(course, !course.is_published)} className="iq-btn iq-btn-line w-full">
                 {course.is_published ? "Hide" : "Publish"}
               </button>
-              <button type="button" disabled={busyId === course.id} onClick={() => setPendingDelete(course)} className="rounded-full border iq-line px-4 py-2 disabled:opacity-50">Remove</button>
+              <button type="button" disabled={busyId === course.id} onClick={() => setPendingDelete(course)} className="iq-btn iq-btn-danger w-full">Remove</button>
             </div>
           </li>
         ))}
@@ -138,9 +138,9 @@ const CourseDesk = () => {
           <div className="w-full max-w-md rounded-2xl border iq-line iq-surface p-5" onClick={(event) => event.stopPropagation()} role="dialog" aria-label="Remove course">
             <h3 className="text-lg font-semibold">Remove {pendingDelete.title}?</h3>
             <p className="mt-2 text-sm iq-muted">This deletes the course and its modules from the site.</p>
-            <div className="mt-4 flex gap-2">
-              <button type="button" disabled={busyId === pendingDelete.id} onClick={() => remove(pendingDelete)} className="rounded-full iq-accent-bg px-4 py-2 text-sm font-semibold disabled:opacity-50">{busyId === pendingDelete.id ? "Removing…" : "Remove course"}</button>
-              <button type="button" onClick={() => setPendingDelete(null)} className="rounded-full border iq-line px-4 py-2 text-sm">Keep it</button>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button type="button" disabled={busyId === pendingDelete.id} onClick={() => remove(pendingDelete)} className="iq-btn iq-btn-danger">{busyId === pendingDelete.id ? "Removing…" : "Remove course"}</button>
+              <button type="button" onClick={() => setPendingDelete(null)} className="iq-btn iq-btn-line">Keep it</button>
             </div>
           </div>
         </div>

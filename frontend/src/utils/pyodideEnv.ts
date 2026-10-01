@@ -6,6 +6,27 @@ declare global {
 }
 
 let pyodideInstance: any = null;
+const PYODIDE_SRC = "https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js";
+
+const ensurePyodideScript = () => new Promise<void>((resolve, reject) => {
+    if (window.loadPyodide) {
+        resolve();
+        return;
+    }
+    const existing = document.querySelector(`script[src="${PYODIDE_SRC}"]`);
+    const onReady = () => window.loadPyodide ? resolve() : reject(new Error("Pyodide library not found. Please refresh."));
+    if (existing) {
+        existing.addEventListener("load", onReady, { once: true });
+        existing.addEventListener("error", () => reject(new Error("Pyodide library not found. Please refresh.")), { once: true });
+        return;
+    }
+    const script = document.createElement("script");
+    script.src = PYODIDE_SRC;
+    script.async = true;
+    script.onload = onReady;
+    script.onerror = () => reject(new Error("Pyodide library not found. Please refresh."));
+    document.head.appendChild(script);
+});
 
 interface PyodideResult {
     success: boolean;
@@ -18,12 +39,7 @@ interface PyodideResult {
 // 🟢 INITIALIZE PYODIDE
 const initPyodide = async () => {
     if (!pyodideInstance) {
-        if (!window.loadPyodide) {
-            console.warn("Pyodide script not found, waiting...");
-            // Optional: You could load script dynamically here if needed
-            if (!window.loadPyodide) throw new Error("Pyodide library not found. Please refresh.");
-        }
-        console.log("Initializing Pyodide...");
+        await ensurePyodideScript();
         pyodideInstance = await window.loadPyodide();
     }
     return pyodideInstance;

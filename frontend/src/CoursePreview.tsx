@@ -308,10 +308,12 @@ const CoursePreview = () => {
       <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-6">
         <div className="flex items-center gap-4">
           <button
+            type="button"
             onClick={() => navigate(`/dashboard/course/${courseId}/builder`)}
-            className="bg-white border border-slate-300 rounded-full p-2.5 text-slate-700 hover:bg-slate-50 transition-all hover:shadow-md cursor-pointer"
+            className="iq-btn iq-btn-icon shrink-0"
+            aria-label="Back to editor"
           >
-            <ArrowLeft size={20} />
+            <ArrowLeft size={16} />
           </button>
           <div className="flex flex-col">
             <h1 className="text-2xl md:text-3xl font-extrabold text-[#0f172a] tracking-tight">{course.title}</h1>
@@ -364,22 +366,23 @@ const CoursePreview = () => {
                                 className="flex-1 p-2 rounded-lg border border-[#005EB8] outline-none text-sm font-bold shadow-sm"
                                 autoFocus
                               />
-                              <button onClick={handleEditModuleSave} className="bg-[#87C232] border-none rounded-lg p-2 text-white hover:bg-[#76a928] transition-colors"><Check size={16} /></button>
-                              <button onClick={() => setEditingModuleId(null)} className="bg-red-500 border-none rounded-lg p-2 text-white hover:bg-red-600 transition-colors"><X size={16} /></button>
+                              <button type="button" onClick={handleEditModuleSave} className="iq-btn iq-btn-primary">Save</button>
+                              <button type="button" onClick={() => setEditingModuleId(null)} className="iq-btn iq-btn-line">Cancel</button>
                             </div>
                           ) : (
                             <div className="flex items-center gap-3 overflow-hidden">
                               <h3 className="text-base md:text-lg font-bold text-[#1e293b] truncate">{module.title}</h3>
                               <div className="flex items-center gap-1">
                                 <button
+                                  type="button"
                                   onClick={(e) => handleEditModuleStart(module, e)}
-                                  className="px-2 py-1 text-xs font-bold text-[#005EB8] border border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors"
+                                  className="iq-btn iq-btn-quiet"
                                 >
                                   Rename
                                 </button>
                                 <button
                                   onClick={(e) => handleDeleteModule(module.id, e)}
-                                  className={`p-1.5 rounded-md transition-colors flex items-center gap-1 ${deleteConfirmId?.id === module.id && deleteConfirmId.type === 'module' ? "text-red-600 bg-red-50 font-bold text-xs" : "text-slate-400 hover:text-red-500 hover:bg-red-50"}`}
+                                  className={`iq-btn ${deleteConfirmId?.id === module.id && deleteConfirmId.type === 'module' ? "iq-btn-danger" : "iq-btn-icon"}`}
                                 >
                                   {deleteConfirmId?.id === module.id && deleteConfirmId.type === 'module' ? "Confirm?" : <Trash2 size={14} />}
                                 </button>
@@ -454,16 +457,17 @@ const CoursePreview = () => {
                                         })()}
 
                                         <div className="flex items-center gap-2">
-                                          <button onClick={() => handleEditItemStart(lesson)} className="p-2 border border-slate-200 rounded-lg bg-white text-slate-400 hover:text-[#005EB8] hover:border-[#005EB8] hover:bg-blue-50 transition-all shadow-sm" title="Edit Details">
-                                            <Edit2 size={16} />
+                                          <button type="button" onClick={() => handleEditItemStart(lesson)} className="iq-btn iq-btn-icon" title="Edit details" aria-label="Edit details">
+                                            <Edit2 size={14} />
                                           </button>
 
                                           <button
+                                            type="button"
                                             onClick={() => handleDeleteItem(lesson.id)}
-                                            className={`p-2 border rounded-lg transition-all shadow-sm flex items-center gap-1 ${deleteConfirmId?.id === lesson.id && deleteConfirmId.type === 'item' ? "bg-red-600 border-red-600 text-white px-3" : "bg-white border-red-100 text-red-400 hover:text-red-600 hover:bg-red-50 hover:border-red-200"}`}
-                                            title="Delete Item"
+                                            className={`iq-btn ${deleteConfirmId?.id === lesson.id && deleteConfirmId.type === 'item' ? "iq-btn-danger" : "iq-btn-icon"}`}
+                                            title="Delete item"
                                           >
-                                            {deleteConfirmId?.id === lesson.id && deleteConfirmId.type === 'item' ? <span className="text-xs font-bold whitespace-nowrap">Confirm?</span> : <Trash2 size={16} />}
+                                            {deleteConfirmId?.id === lesson.id && deleteConfirmId.type === 'item' ? "Confirm?" : <Trash2 size={14} />}
                                           </button>
                                         </div>
                                       </div>
@@ -523,7 +527,7 @@ const CoursePreview = () => {
                         <button
                           type="button"
                           onClick={() => removeEditResourceLink(index)}
-                          style={{ border: "none", background: "#fee2e2", color: "#dc2626", borderRadius: "8px", padding: "0 10px", cursor: "pointer", fontWeight: 700 }}
+                          className="iq-btn iq-btn-danger shrink-0"
                         >
                           Remove
                         </button>
@@ -534,15 +538,16 @@ const CoursePreview = () => {
                 <button
                   type="button"
                   onClick={addEditResourceLink}
-                  style={{ marginTop: "10px", border: "none", background: "none", color: brand.blue, fontWeight: 700, cursor: "pointer" }}
+                  className="iq-btn iq-btn-quiet"
+                  style={{ marginTop: "10px" }}
                 >
-                  + Add Another Resource Link
+                  Add resource
                 </button>
               </div>
             )}
-            <div style={{ display: "flex", gap: "10px" }}>
-              <button onClick={handleEditItemSave} style={{ flex: 1, padding: "10px", background: brand.blue, color: "white", border: "none", borderRadius: "8px", fontWeight: "700", cursor: "pointer" }}>Save Changes</button>
-              <button onClick={() => setEditingItem(null)} style={{ flex: 1, padding: "10px", background: "var(--iq-surface)", color: brand.textLight, border: `1px solid ${brand.border}`, borderRadius: "8px", fontWeight: "700", cursor: "pointer" }}>Cancel</button>
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setEditingItem(null)} className="iq-btn iq-btn-line">Cancel</button>
+              <button type="button" onClick={handleEditItemSave} className="iq-btn iq-btn-primary">Save</button>
             </div>
           </div>
         </div>

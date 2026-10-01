@@ -134,16 +134,24 @@ export const PATHS = [
 
 export const FAQS = [
   {
-    q: "Are the videos hosted by IQNex?",
-    a: "Lessons play on IQNex. The creator's name, channel and source link stay on the page. We do not download or re-upload videos.",
+    q: "Where do I find my courses?",
+    a: "Sign in with your learner account. Courses you are enrolled in appear under My learning. This page describes the school; it does not publish the live catalogue.",
   },
   {
-    q: "What do I get after I sign in?",
-    a: "Sign in to open your courses, the player, assignments and progress. This page only describes what those areas are.",
+    q: "Where do the lessons play?",
+    a: "Lessons open inside IQNex. YouTube lessons are embedded there, with the creator named on the lesson. IQNex does not download or re-upload those videos.",
   },
   {
-    q: "How do I report a lesson?",
-    a: "Email contact@iqmath.in with the course link and what should come down. A person reviews it.",
+    q: "How do paid courses work?",
+    a: "A paid course opens Razorpay checkout. You can pay with UPI, a card, netbanking, or a wallet. The course is added to your account after the payment is verified.",
+  },
+  {
+    q: "When is a certificate issued?",
+    a: "After you submit the course assessment. Download it from the certificate page in your account.",
+  },
+  {
+    q: "How do I reach the school?",
+    a: "Email contact@iqmath.in or WhatsApp +91 93609 60219. Include the course name if you are asking about a lesson.",
   },
 ];
 

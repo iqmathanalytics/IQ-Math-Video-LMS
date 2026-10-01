@@ -26,6 +26,17 @@ export const parseYouTubeUrl = (value: string): ParsedYouTube | null => {
   return null;
 };
 
+export const embedSrcFromLink = (value: string) => {
+  const raw = (value || "").trim();
+  const videoId = youtubeIdFromLink(raw);
+  if (videoId) return `https://www.youtube-nocookie.com/embed/${videoId}`;
+  const drive = raw.match(/drive\.google\.com\/file\/d\/([\w-]+)/);
+  if (drive) return `https://drive.google.com/file/d/${drive[1]}/preview`;
+  const doc = raw.match(/docs\.google\.com\/(document|presentation|spreadsheets)\/d\/([\w-]+)/);
+  if (doc) return `https://docs.google.com/${doc[1]}/d/${doc[2]}/preview`;
+  return "";
+};
+
 export const youtubeIdFromLink = (value: string) => {
   const raw = value.trim();
   const patterns = [

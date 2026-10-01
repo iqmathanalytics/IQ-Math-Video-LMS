@@ -5,7 +5,7 @@ import API_BASE_URL from "../config";
 import BrandLogo from "../components/BrandLogo";
 import { useDayTheme } from "../public/useDayTheme";
 import { clearSession, getValidSession } from "../utils/session";
-import { youtubeIdFromLink } from "../utils/youtube";
+import { embedSrcFromLink, youtubeIdFromLink } from "../utils/youtube";
 import CourseFacts from "../components/CourseFacts";
 import CourseCover from "../components/CourseCover";
 
@@ -65,7 +65,7 @@ const Shell = () => {
 
   return (
     <div data-theme={theme} className="iq-page min-h-screen" style={{ fontFamily: "Inter, sans-serif" }}>
-      <header className="sticky top-0 z-40 border-b iq-line iq-header backdrop-blur-xl">
+      <header className="sticky top-0 z-30 border-b iq-line iq-header backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
           <Link to="/home" aria-label="Home"><BrandLogo tone={theme === "dark" ? "onDark" : "ink"} size="sm" /></Link>
           <nav className="hidden flex-wrap items-center gap-1 lg:flex" aria-label="Student">
@@ -73,6 +73,7 @@ const Shell = () => {
             <NavLink to="/courses" className={({ isActive }) => `${item} ${isActive ? active : ""}`}>Courses</NavLink>
             <NavLink to="/my-courses" className={({ isActive }) => `${item} ${isActive ? active : ""}`}>My learning</NavLink>
             <NavLink to="/certificates" className={({ isActive }) => `${item} ${isActive ? active : ""}`}>Certificates</NavLink>
+            <NavLink to="/programs" className={({ isActive }) => `${item} ${isActive ? active : ""}`}>Programs</NavLink>
             <NavLink to="/profile" className={({ isActive }) => `${item} ${isActive ? active : ""}`}>Profile</NavLink>
           </nav>
           <button type="button" className="text-sm iq-muted" onClick={() => { clearSession(); navigate("/login"); }}>Sign out</button>
@@ -92,85 +93,40 @@ const Shell = () => {
 
 const loadCourses = async (): Promise<CourseCard[]> => {
   const headers = authHeaders();
-  const [mine, watch] = await Promise.all([
-    axios.get(`${API_BASE_URL}/my-courses`, { headers }).catch(() => ({ data: [] })),
-    axios.get(`${API_BASE_URL}/watch`).catch(() => ({ data: [] })),
-  ]);
-  const enrolled: CourseCard[] = (Array.isArray(mine.data) ? mine.data : []).map((course: { id: number; title: string; description: string; has_certificate?: boolean; image_url?: string | null }) => ({
-    id: String(course.id),
-    title: course.title,
-    description: course.description || "Lessons, practice, and a certificate when you finish.",
-    image_url: course.image_url,
-    has_certificate: course.has_certificate,
-  }));
-  const demos = Array.isArray(watch.data) ? watch.data : [];
-  if (demos.length) {
-    const done = new Set(demoDone());
-    enrolled.unshift({
-      id: "demos",
-      title: "Demo lessons",
-      description: "IQNex lessons added by your instructor. They play here, and the creator stays on the player.",
-      demo: true,
-      lessonCount: demos.length,
-      doneCount: demos.filter((lesson: { id: number }) => done.has(String(lesson.id))).length,
-    });
-  }
-  return enrolled;
+  const mine = await axios.get(`${API_BASE_URL}/my-courses`, { headers }).catch(() => ({ data: [] }));
+  return (Array.isArray(mine.data) ? mine.data : [])
+        .map((course: { id: number; title: string; description: string; has_certificate?: boolean; image_url?: string | null; lessons_total?: number; lessons_done?: number }) => ({
+      id: String(course.id),
+      title: course.title,
+      description: course.description || "Lessons, practice, and a certificate when you finish.",
+      image_url: course.image_url,
+      has_certificate: course.has_certificate,
+      lessonCount: course.lessons_total ?? 0,
+      doneCount: course.lessons_done ?? 0,
+    }));
 };
 
 const MyCourses = () => {
   const [courses, setCourses] = useState<CourseCard[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [query, setQuery] = useState("");
-  const [note, setNote] = useState("");
-  const [busyId, setBusyId] = useState("");
 
   useEffect(() => {
     loadCourses().then((rows) => { setCourses(rows); setStatus("ready"); }).catch(() => setStatus("error"));
   }, []);
 
   const shown = courses.filter((course) => course.title.toLowerCase().includes(query.trim().toLowerCase()));
-  const certCourses = courses.filter((course) => !course.demo);
-
-  const download = async (course: CourseCard) => {
-    setBusyId(course.id);
-    setNote("");
-    try {
-      await downloadCertificate(course.id, course.title);
-    } catch (err: unknown) {
-      setNote(err instanceof Error ? err.message : "Submit the assessments before downloading this certificate.");
-    } finally {
-      setBusyId("");
-    }
-  };
 
   return (
     <div>
       <h1 className="text-3xl font-semibold" style={{ fontFamily: '"Space Grotesk", Inter, sans-serif' }}>My courses</h1>
-      <p className="mt-2 max-w-2xl text-sm iq-muted">Open a course to see progress, continue a lesson, keep notes, take assessments, and unlock the certificate.</p>
-      <section className="mt-8 rounded-2xl border iq-line p-5">
-        <h2 className="text-xl font-semibold">Certificates</h2>
-        <p className="mt-1 text-sm iq-muted">After you submit the assessments, download the certificate from here. It is created on this site and saved to your device.</p>
-        {certCourses.length === 0 && <p className="mt-4 text-sm iq-muted">Certificates appear after you are enrolled in a course.</p>}
-        <ul className="mt-4 space-y-3">
-          {certCourses.map((course) => (
-            <li key={course.id} className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="font-semibold">{course.title}</p>
-                <p className="text-sm iq-muted">{course.has_certificate ? "Already issued" : "Available after assessments are submitted"}</p>
-              </div>
-              <button type="button" disabled={busyId === course.id} onClick={() => download(course)} className="rounded-full iq-accent-bg px-4 py-2 text-sm font-semibold disabled:opacity-50">{busyId === course.id ? "Preparing…" : "Download"}</button>
-            </li>
-          ))}
-        </ul>
-        {note && <p className="mt-3 text-sm iq-muted">{note}</p>}
-      </section>
+      <p className="mt-2 max-w-2xl text-sm iq-muted">Open a course to see progress, continue a lesson, keep notes, and take assessments.</p>
       <label className="mt-6 block max-w-sm text-sm">Search
         <input value={query} onChange={(event) => setQuery(event.target.value)} className="mt-1 w-full rounded-xl border iq-line iq-surface px-3 py-3" />
       </label>
       {status === "loading" && <p className="mt-8 text-sm iq-muted">Loading your courses…</p>}
       {status === "error" && <p className="mt-8 text-sm iq-muted">Courses could not be loaded. Check your connection and refresh.</p>}
-      {status === "ready" && shown.length === 0 && <p className="mt-8 rounded-2xl border iq-line p-6 text-sm iq-muted">No courses yet. Demo lessons appear here after an instructor adds an IQNex link.</p>}
+      {status === "ready" && shown.length === 0 && <p className="mt-8 rounded-2xl border iq-line p-6 text-sm iq-muted">No published course is on your account yet.</p>}
       <ul className="mt-6 grid gap-4 md:grid-cols-2">
         {shown.map((course) => (
           <li key={course.id}>
@@ -269,13 +225,13 @@ const CourseDashboard = () => {
               <p className="text-4xl font-semibold tabular-nums">{percent}%</p>
               <p className="mt-1 text-sm iq-muted" title="Completed lessons divided by all lessons in the course.">{done} of {total} lessons complete. Progress is lessons finished, not minutes skipped.</p>
               <div className="mt-4 h-2 overflow-hidden rounded-full iq-track"><div className="h-full iq-fill" style={{ width: `${percent}%` }} /></div>
-              {next && <Link to={`/learn/${courseId}/${next.id}`} className="mt-5 inline-flex rounded-full iq-accent-bg px-4 py-3 text-sm font-semibold">Continue: {next.title}</Link>}
+              {next && <Link to={`/course/${courseId}/player?lesson=${next.id}`} className="mt-5 inline-flex rounded-full iq-accent-bg px-4 py-3 text-sm font-semibold">Continue: {next.title}</Link>}
             </article>
             <article className="rounded-2xl border iq-line p-5">
               <h2 className="font-semibold">Certificate</h2>
               <ul className="mt-3 space-y-2 text-sm iq-muted">
-                <li>Submit the assessment file or project link</li>
-                <li>The certificate is issued after that submission is saved</li>
+                <li>Finish every module in this course</li>
+                <li>Submit the assessment, then download the certificate</li>
               </ul>
               <Link to={`/my-courses/${courseId}/certificate`} className="mt-4 inline-block text-sm iq-link">View certificate</Link>
             </article>
@@ -286,13 +242,18 @@ const CourseDashboard = () => {
             <Link className="rounded-full border iq-line px-4 py-2" to={`/my-courses/${courseId}/assessments`}>Assessments</Link>
           </div>
           <ol className="mt-8 space-y-4">
-            {modules.map((module) => (
+            {modules.map((module) => {
+              const first = module.lessons[0];
+              return (
               <li key={module.id} className="rounded-2xl border iq-line p-4">
-                <h2 className="font-semibold">{module.title}</h2>
+                <h2 className="font-semibold">
+                  {first ? <Link className="iq-link" to={`/course/${courseId}/player?lesson=${first.id}`}>{module.title}</Link> : module.title}
+                </h2>
+                {module.lessons.length === 0 && <p className="mt-2 text-sm iq-muted">This topic has no lesson yet.</p>}
                 <ul className="mt-3 space-y-2">
                   {module.lessons.map((lesson) => (
                     <li key={lesson.id}>
-                      <Link to={`/learn/${courseId}/${lesson.id}`} className="flex items-center justify-between rounded-xl px-2 py-2 iq-hover">
+                      <Link to={`/course/${courseId}/player?lesson=${lesson.id}`} className="flex items-center justify-between rounded-xl px-2 py-2 iq-hover">
                         <span>{lesson.title}</span>
                         <span className="text-xs iq-faint">{lesson.is_completed ? "Done" : lesson.type}</span>
                       </Link>
@@ -300,7 +261,8 @@ const CourseDashboard = () => {
                   ))}
                 </ul>
               </li>
-            ))}
+              );
+            })}
           </ol>
         </>
       )}
@@ -310,10 +272,12 @@ const CourseDashboard = () => {
 
 const LearnPage = () => {
   const { courseId = "", lessonId = "" } = useParams();
+  const navigate = useNavigate();
   const [title, setTitle] = useState("");
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [siblings, setSiblings] = useState<Lesson[]>([]);
   const [note, setNote] = useState("");
+  const [noteLesson, setNoteLesson] = useState("");
   const [saved, setSaved] = useState("Saved");
   const [focus, setFocus] = useState(false);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -324,22 +288,44 @@ const LearnPage = () => {
       setTitle(data.title);
       setSiblings(lessons);
       setLesson(lessons.find((item) => item.id === lessonId) || null);
-      setNote(localStorage.getItem(notesKey(courseId, lessonId)) || "");
       setStatus("ready");
+      if (courseId === "demos") {
+        setNote(localStorage.getItem(notesKey(courseId, lessonId)) || "");
+        setNoteLesson(lessonId);
+        return;
+      }
+      axios.get(`${API_BASE_URL}/courses/${courseId}/notes`, { headers: authHeaders() })
+        .then((res) => {
+          const rows = Array.isArray(res.data) ? res.data : [];
+          const found = rows.find((row: { lesson_id: number; body?: string }) => String(row.lesson_id) === lessonId);
+          setNote(found?.body || localStorage.getItem(notesKey(courseId, lessonId)) || "");
+          setNoteLesson(lessonId);
+        })
+        .catch(() => {
+          setNote(localStorage.getItem(notesKey(courseId, lessonId)) || "");
+          setNoteLesson(lessonId);
+        });
     }).catch(() => setStatus("error"));
   }, [courseId, lessonId]);
 
   useEffect(() => {
-    if (status !== "ready") return;
+    if (status !== "ready" || noteLesson !== lessonId) return;
     setSaved("Saving…");
     const timer = window.setTimeout(() => {
       localStorage.setItem(notesKey(courseId, lessonId), note);
-      setSaved("Saved on this device");
+      if (courseId === "demos") {
+        setSaved("Saved on this device");
+        return;
+      }
+      axios.put(`${API_BASE_URL}/courses/${courseId}/notes/${lessonId}`, { body: note }, { headers: authHeaders() })
+        .then(() => setSaved("Saved on your account"))
+        .catch(() => setSaved("Saved on this device"));
     }, 800);
     return () => window.clearTimeout(timer);
-  }, [note, courseId, lessonId, status]);
+  }, [note, courseId, lessonId, status, noteLesson]);
 
   const videoId = lesson ? youtubeIdFromLink(lesson.url || "") : "";
+  const embedSrc = lesson ? embedSrcFromLink(lesson.url || "") : "";
   const index = siblings.findIndex((item) => item.id === lessonId);
   const previous = index > 0 ? siblings[index - 1] : null;
   const next = index >= 0 && index < siblings.length - 1 ? siblings[index + 1] : null;
@@ -357,12 +343,12 @@ const LearnPage = () => {
   };
 
   return (
-    <div className={focus ? "fixed inset-0 z-50 overflow-auto iq-page p-4" : ""}>
+    <div className={focus ? "fixed inset-0 z-50 flex h-screen flex-col overflow-hidden iq-page p-4 lg:p-6" : ""}>
       {status === "loading" && <p className="text-sm iq-muted">Opening the lesson…</p>}
       {status === "error" && <p className="text-sm iq-muted">This lesson could not be opened.</p>}
       {status === "ready" && !lesson && <p className="text-sm iq-muted">That lesson is not in this course.</p>}
       {lesson && (
-        <div className="grid gap-4 lg:grid-cols-[16rem_1fr_18rem]">
+        <div className={focus ? "grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]" : "grid gap-4 lg:grid-cols-[16rem_1fr_18rem]"}>
           <aside className={focus ? "hidden" : "rounded-2xl border iq-line p-3 lg:max-h-[80vh] lg:overflow-auto"}>
             <Link to={`/my-courses/${courseId}`} className="text-sm iq-link">{title}</Link>
             <ul className="mt-3 space-y-1">
@@ -373,27 +359,46 @@ const LearnPage = () => {
               ))}
             </ul>
           </aside>
-          <section>
-            {videoId ? (
-              <div className="overflow-hidden rounded-2xl border iq-line bg-black">
-                <iframe className="aspect-video w-full" src={`https://www.youtube-nocookie.com/embed/${videoId}`} title={lesson.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen />
+          <section className={focus ? "flex min-h-0 flex-col items-center justify-center" : ""}>
+            <div className={focus ? "w-full max-w-4xl" : ""}>
+              {focus && siblings.length > 1 && (
+                <label className="mb-3 block text-sm">
+                  Lesson
+                  <select
+                    aria-label="Lesson"
+                    className="mt-1 w-full rounded-xl border iq-line iq-surface px-3 py-2"
+                    value={lesson.id}
+                    onChange={(event) => navigate(`/learn/${courseId}/${event.target.value}`)}
+                  >
+                    {siblings.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+                  </select>
+                </label>
+              )}
+              {embedSrc ? (
+                <div className="overflow-hidden rounded-2xl border iq-line bg-black">
+                  <iframe key={embedSrc} className="aspect-video w-full" src={embedSrc} title={lesson.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen />
+                </div>
+              ) : (
+                <div className="whitespace-pre-wrap rounded-2xl border iq-line p-6 text-sm">
+                  {lesson.instructions || "This lesson has no embedded video."}
+                  {lesson.url && <p className="mt-3"><a className="iq-link" href={lesson.url} target="_blank" rel="noreferrer">{lesson.url}</a></p>}
+                </div>
+              )}
+              <h1 className="mt-4 text-2xl font-semibold">{lesson.title}</h1>
+              {videoId && <p className="mt-1 text-sm iq-muted">Playing on IQNex. <a className="iq-link" href={`https://www.youtube.com/watch?v=${videoId}`} target="_blank" rel="noreferrer">Watch on IQNex</a></p>}
+              <div className="mt-4 flex flex-wrap gap-2 text-sm">
+                {previous && <Link className="rounded-full border iq-line px-3 py-2" to={`/learn/${courseId}/${previous.id}`}>Previous</Link>}
+                {next && <Link className="rounded-full border iq-line px-3 py-2" to={`/learn/${courseId}/${next.id}`}>Next</Link>}
+                <button type="button" className="rounded-full iq-accent-bg px-3 py-2 font-semibold" onClick={markDone}>{lesson.is_completed ? "Completed" : "Mark complete"}</button>
+                <button type="button" className="rounded-full border iq-line px-3 py-2" onClick={() => setFocus((value) => !value)}>{focus ? "Exit focus" : "Focus"}</button>
               </div>
-            ) : (
-              <div className="rounded-2xl border iq-line p-6 text-sm iq-muted">{lesson.instructions || lesson.url || "This lesson has no embedded video."}</div>
-            )}
-            <h1 className="mt-4 text-2xl font-semibold">{lesson.title}</h1>
-            {videoId && <p className="mt-1 text-sm iq-muted">Playing on IQNex. <a className="iq-link" href={`https://www.youtube.com/watch?v=${videoId}`} target="_blank" rel="noreferrer">Watch on IQNex</a></p>}
-            <div className="mt-4 flex flex-wrap gap-2 text-sm">
-              {previous && <Link className="rounded-full border iq-line px-3 py-2" to={`/learn/${courseId}/${previous.id}`}>Previous</Link>}
-              {next && <Link className="rounded-full border iq-line px-3 py-2" to={`/learn/${courseId}/${next.id}`}>Next</Link>}
-              <button type="button" className="rounded-full iq-accent-bg px-3 py-2 font-semibold" onClick={markDone}>{lesson.is_completed ? "Completed" : "Mark complete"}</button>
-              <button type="button" className="rounded-full border iq-line px-3 py-2" onClick={() => setFocus((value) => !value)}>{focus ? "Exit focus" : "Focus"}</button>
             </div>
           </section>
-          <aside className="rounded-2xl border iq-line p-4">
+          <aside className={`rounded-2xl border iq-line p-4 ${focus ? "flex min-h-0 flex-col" : ""}`}>
             <div className="flex items-center justify-between"><h2 className="font-semibold">Notes</h2><span className="text-xs iq-faint">{saved}</span></div>
-            <p className="mt-1 text-xs iq-muted">Private to this browser. They are not shown to other students.</p>
-            <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={12} className="mt-3 w-full rounded-xl border iq-line iq-surface px-3 py-3 text-sm" placeholder="Write what you want to remember." />
+            <p className="mt-1 text-xs iq-muted">Saved on your account, and kept in this browser if you are offline.</p>
+            <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={focus ? undefined : 12} className={`mt-3 w-full rounded-xl border iq-line iq-surface px-3 py-3 text-sm ${focus ? "min-h-48 flex-1 resize-none" : ""}`} placeholder="Write what you want to remember." />
+            <Link to={`/course/${courseId}/player?lesson=${lesson.id}`} className="mt-3 inline-block text-sm iq-link">Open assignments, quizzes, and code for this lesson</Link>
             <Link to={`/my-courses/${courseId}/notes`} className="mt-3 inline-block text-sm iq-link">Open notebook</Link>
           </aside>
         </div>
@@ -407,12 +412,19 @@ const Notebook = () => {
   const [rows, setRows] = useState<{ lessonId: string; title: string; note: string }[]>([]);
 
   useEffect(() => {
-    courseModules(courseId).then((data) => {
+    courseModules(courseId).then(async (data) => {
       const lessons = data.modules.flatMap((module) => module.lessons);
+      const saved: Record<string, string> = {};
+      if (courseId !== "demos") {
+        try {
+          const res = await axios.get(`${API_BASE_URL}/courses/${courseId}/notes`, { headers: authHeaders() });
+          for (const row of Array.isArray(res.data) ? res.data : []) saved[String(row.lesson_id)] = row.body || "";
+        } catch { /* local notes remain available */ }
+      }
       setRows(lessons.map((lesson) => ({
         lessonId: lesson.id,
         title: lesson.title,
-        note: localStorage.getItem(notesKey(courseId, lesson.id)) || "",
+        note: saved[lesson.id] || localStorage.getItem(notesKey(courseId, lesson.id)) || "",
       })).filter((row) => row.note.trim()));
     }).catch(() => setRows([]));
   }, [courseId]);
@@ -453,9 +465,12 @@ const Assessments = () => {
   const [savedLink, setSavedLink] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [modules, setModules] = useState<ModuleBlock[]>([]);
+  const [progressState, setProgressState] = useState<"loading" | "ready">("loading");
 
   useEffect(() => {
     if (courseId === "demos") return;
+    courseModules(courseId).then((data) => setModules(data.modules)).catch(() => setMessage("Course progress could not be loaded.")).finally(() => setProgressState("ready"));
     axios.get(`${API_BASE_URL}/courses/${courseId}/assessment`, { headers: authHeaders() })
       .then((res) => {
         setSubmitted(Boolean(res.data?.submitted));
@@ -465,10 +480,18 @@ const Assessments = () => {
       .catch(() => setMessage("The assessment could not be loaded."));
   }, [courseId]);
 
+  const lessons = modules.flatMap((module) => module.lessons);
+  const modulesOpen = modules.filter((module) => module.lessons.some((lesson) => !lesson.is_completed));
+  const modulesComplete = lessons.length > 0 && modulesOpen.length === 0;
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (courseId === "demos") {
       setMessage("Demo lessons do not take an assessment.");
+      return;
+    }
+    if (!modulesComplete) {
+      setMessage("Finish every module before submitting the assessment.");
       return;
     }
     if (!file && !link.trim()) {
@@ -487,7 +510,7 @@ const Assessments = () => {
       setSavedLink(res.data?.link || "");
       setFile(null);
       setLink("");
-      setMessage("Submitted. Your certificate is ready to download.");
+      setMessage("Submitted. The certificate can be downloaded.");
     } catch (err: unknown) {
       const detail = axios.isAxiosError(err) ? err.response?.data?.detail : "";
       setMessage(typeof detail === "string" ? detail : "The assessment could not be submitted.");
@@ -500,7 +523,13 @@ const Assessments = () => {
     <div>
       <p className="text-sm iq-muted"><Link to={`/my-courses/${courseId}`} className="iq-link">Back to course</Link></p>
       <h1 className="mt-2 text-3xl font-semibold">Assessment</h1>
-      <p className="mt-2 max-w-2xl text-sm iq-muted">Upload your project file, or paste a link to the project folder. The certificate is issued after this submission is saved.</p>
+      <p className="mt-2 max-w-2xl text-sm iq-muted">Finish every module first. The assessment opens after that, and the certificate follows the submission.</p>
+      {!modulesComplete && progressState === "ready" && (
+        <div className="mt-4 rounded-2xl border iq-line p-4 text-sm">
+          <p>The assessment stays closed until every module is complete.</p>
+          {modulesOpen.length > 0 && <p className="mt-2 iq-muted">Still open: {modulesOpen.map((module) => module.title).join(", ")}</p>}
+        </div>
+      )}
       {submitted && (
         <p className="mt-4 rounded-2xl border iq-line p-4 text-sm">
           Submitted{savedName ? `: ${savedName}` : ""}{savedLink ? ` · ${savedLink}` : ""}.{" "}
@@ -509,12 +538,12 @@ const Assessments = () => {
       )}
       <form onSubmit={submit} className="mt-6 max-w-xl space-y-4">
         <label className="block text-sm">Project file
-          <input type="file" accept=".pdf,.zip,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.txt" onChange={(event) => setFile(event.target.files?.[0] || null)} className="mt-1 block w-full text-sm" />
+          <input type="file" disabled={!modulesComplete} accept=".pdf,.zip,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.txt" onChange={(event) => setFile(event.target.files?.[0] || null)} className="mt-1 block w-full text-sm disabled:opacity-50" />
         </label>
         <label className="block text-sm">Project folder link
-          <input value={link} onChange={(event) => setLink(event.target.value)} placeholder="https://" className="mt-1 w-full rounded-xl border iq-line iq-surface px-3 py-3" />
+          <input value={link} disabled={!modulesComplete} onChange={(event) => setLink(event.target.value)} placeholder="https://" className="mt-1 w-full rounded-xl border iq-line iq-surface px-3 py-3 disabled:opacity-50" />
         </label>
-        <button disabled={busy || courseId === "demos"} className="rounded-full iq-accent-bg px-4 py-3 text-sm font-semibold disabled:opacity-50">{busy ? "Submitting…" : submitted ? "Submit again" : "Submit assessment"}</button>
+        <button disabled={busy || progressState === "loading" || !modulesComplete || courseId === "demos"} className="rounded-full iq-accent-bg px-4 py-3 text-sm font-semibold disabled:opacity-50">{busy ? "Submitting…" : progressState === "loading" ? "Checking modules…" : !modulesComplete ? "Finish the modules first" : submitted ? "Submit again" : "Submit assessment"}</button>
       </form>
       {message && <p className="mt-3 text-sm iq-muted">{message}</p>}
     </div>
@@ -535,7 +564,9 @@ const CertificatePage = () => {
       axios.get(`${API_BASE_URL}/courses/${courseId}/assessment`, { headers: authHeaders() }).catch(() => ({ data: { submitted: false } })),
     ]).then(([course, assessment]) => {
       setTitle(course.title || "Course");
-      setReady(Boolean(assessment.data?.submitted));
+      const mods = "modules" in course ? course.modules : [];
+      const progress = progressOf(mods || []);
+      setReady(Boolean(assessment.data?.submitted) && progress.total > 0 && progress.done === progress.total);
     });
   }, [courseId]);
 
@@ -563,8 +594,8 @@ const CertificatePage = () => {
       <h1 className="mt-2 text-3xl font-semibold">Certificate</h1>
       <p className="mt-2 max-w-2xl text-sm iq-muted">
         {title}. {ready
-          ? "Your assessment is submitted. Download the certificate to this device."
-          : "Upload the assessment file or project link before the certificate is issued."}
+          ? "Every lesson is complete and the assessment is submitted. Download the certificate."
+          : "Finish every lesson and submit the assessment before the certificate is issued."}
       </p>
       <button type="button" disabled={busy || !ready || courseId === "demos"} onClick={download} className="mt-6 rounded-full iq-accent-bg px-4 py-3 text-sm font-semibold disabled:opacity-50">{busy ? "Preparing…" : "Download certificate"}</button>
       {message && <p className="mt-3 text-sm iq-muted">{message}</p>}
@@ -573,6 +604,7 @@ const CertificatePage = () => {
 };
 
 const StudentSettings = () => {
+  const [current, setCurrent] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
 
@@ -580,18 +612,23 @@ const StudentSettings = () => {
     event.preventDefault();
     if (password.length < 8) { setMessage("Use at least 8 characters."); return; }
     try {
-      await axios.post(`${API_BASE_URL}/user/change-password`, { new_password: password }, { headers: authHeaders() });
+      await axios.post(`${API_BASE_URL}/user/change-password`, { current_password: current, new_password: password }, { headers: authHeaders() });
+      setCurrent("");
       setPassword("");
       setMessage("Password updated.");
-    } catch {
-      setMessage("The password could not be updated.");
+    } catch (err: unknown) {
+      const detail = axios.isAxiosError(err) ? err.response?.data?.detail : "";
+      setMessage(typeof detail === "string" ? detail : "The password could not be updated.");
     }
   };
 
   return (
     <form onSubmit={save} className="max-w-md">
       <h1 className="text-3xl font-semibold">Settings</h1>
-      <label className="mt-6 block text-sm">New password
+      <label className="mt-6 block text-sm">Current password
+        <input type="password" value={current} onChange={(event) => setCurrent(event.target.value)} autoComplete="current-password" className="mt-1 w-full rounded-xl border iq-line iq-surface px-3 py-3" />
+      </label>
+      <label className="mt-4 block text-sm">New password
         <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" className="mt-1 w-full rounded-xl border iq-line iq-surface px-3 py-3" />
       </label>
       <button className="mt-4 rounded-full iq-accent-bg px-4 py-3 text-sm font-semibold">Update password</button>

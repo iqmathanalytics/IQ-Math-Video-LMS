@@ -115,7 +115,7 @@ const PublicShell = ({ title, children }: { title?: string; children: ReactNode 
         <div className={`mx-auto grid max-w-6xl gap-8 px-4 py-12 ${NAV.length > 0 ? "sm:grid-cols-2" : ""}`}>
           <div>
             <BrandLogo tone={theme === "dark" ? "onDark" : "ink"} size="sm" />
-            <p className="mt-3 text-sm iq-muted">A learner account for IQNex courses. Your list opens after you sign in.</p>
+            <p className="mt-3 max-w-sm text-sm iq-muted">IQ Math courses for analytics, programming, and applied AI. Sign in to continue the work that is already on your account.</p>
           </div>
           {NAV.length > 0 && (
             <div>
