@@ -26,6 +26,7 @@ import string
 import pandas as pd     
 import requests 
 import razorpay
+from certificate_pdf import create_certificate_pdf
 import google.generativeai as genai 
 import re  
 import schemas
@@ -37,7 +38,7 @@ from dotenv import load_dotenv
 from pydantic import BaseModel
 # --- 📄 PDF GENERATION IMPORTS ---
 from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import landscape, A4
+from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.units import inch
 from reportlab.lib.utils import ImageReader
@@ -674,68 +675,6 @@ def upload_file_to_drive(file_obj, filename, folder_link):
         print(f"Drive Error: {e}")
         return None
 
-def create_certificate_pdf(student_name: str, course_name: str, date_str: str, credential_id: str = ""):
-    """Landscape certificate matching the IQmath certificate layout (name, body, number, date)."""
-    buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=landscape(A4))
-    width, height = landscape(A4)
-    gold = colors.Color(201 / 255, 162 / 255, 39 / 255)
-    ink = colors.Color(37 / 255, 37 / 255, 37 / 255)
-
-    c.setFillColor(colors.white)
-    c.rect(0, 0, width, height, fill=1, stroke=0)
-    c.setStrokeColor(gold)
-    c.setLineWidth(3)
-    c.rect(18, 18, width - 36, height - 36)
-    c.setLineWidth(1)
-    c.rect(26, 26, width - 52, height - 52)
-
-    c.setFillColor(gold)
-    c.setFont("Times-Bold", 28)
-    c.drawCentredString(width / 2, height - 92, "IQ Math Technologies")
-    c.setFillColor(ink)
-    c.setFont("Times-Bold", 18)
-    c.drawCentredString(width / 2, height - 118, "Certificate of Completion")
-
-    c.setFillColor(gold)
-    c.setFont("Times-Italic", 36)
-    c.drawCentredString(width / 2, height * 0.58, (student_name or "Student").upper())
-
-    body = (
-        f"This is to certify that the above-named participant has successfully completed "
-        f"{course_name}, including the required assessments, demonstrating dedication and proficiency "
-        f"in the subject matter."
-    )
-    c.setFillColor(ink)
-    c.setFont("Times-Roman", 12)
-    text = c.beginText()
-    text.setTextOrigin(width * 0.14, height * 0.46)
-    text.setFont("Times-Roman", 12)
-    line = ""
-    for word in body.split():
-        trial = (line + " " + word).strip()
-        if c.stringWidth(trial, "Times-Roman", 12) > width * 0.72:
-            text.textLine(line)
-            line = word
-        else:
-            line = trial
-    if line:
-        text.textLine(line)
-    c.drawText(text)
-
-    c.setFont("Times-Bold", 11)
-    c.drawString(width * 0.12, height * 0.18, "Certificate No:")
-    c.setFont("Times-Roman", 11)
-    c.drawString(width * 0.28, height * 0.18, credential_id or "IQ-LMS")
-    c.setFont("Times-Bold", 11)
-    c.drawRightString(width * 0.72, height * 0.18, "Issued:")
-    c.setFont("Times-Roman", 11)
-    c.drawRightString(width * 0.88, height * 0.18, date_str)
-
-    c.showPage()
-    c.save()
-    buffer.seek(0)
-    return buffer
 
 # --- 🔄 ASYNC LOGIC HELPERS ---
 # --- 🔄 UPDATED LOGIC: Strict 100% Completion Check ---
@@ -2111,6 +2050,8 @@ async def generate_pdf_endpoint(course_id: int, db: AsyncSession = Depends(get_d
         course.title,
         formatted_date,
         certificate.certificate_id,
+        course.description or "",
+        course.course_type or "",
     )
     return StreamingResponse(pdf, media_type="application/pdf")
 

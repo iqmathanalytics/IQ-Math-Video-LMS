@@ -28,11 +28,22 @@ body {
   background: #64748b; 
 }
 
+html { scroll-behavior: smooth; }
+
 @media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
+  html { scroll-behavior: auto; }
+  .iq-reveal, .iq-float, .iq-card-lift { animation: none !important; transition: none !important; opacity: 1 !important; transform: none !important; }
 }
+
+.iq-reveal { opacity: 0; transform: translateY(18px); }
+.iq-reveal.is-in { opacity: 1; transform: none; transition: opacity 0.7s ease, transform 0.7s ease; }
+.iq-card-lift { transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease; }
+.iq-card-lift:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(18, 32, 51, 0.08); }
+@keyframes iq-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+.iq-float { animation: iq-float 7s ease-in-out infinite; }
 
 /* Public site follows local time: light 06:00–18:00, dark overnight. */
 [data-theme="light"] {
