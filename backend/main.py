@@ -783,7 +783,6 @@ async def create_user(request: Request, user: UserCreate, db: AsyncSession = Dep
     db.add(new_user)
     await db.commit()
     await db.refresh(new_user)
-    await grant_published_courses(db, user_ids=[new_user.id])
 
     # 3. 📧 SEND OTP EMAIL
     otp_code = str(random.randint(100000, 999999))
@@ -875,7 +874,6 @@ async def admit_single_student(req: AdmitStudentRequest, db: AsyncSession = Depe
             enrolled.append(cid)
     
     await db.commit()
-    await grant_published_courses(db, user_ids=[student.id])
 
     if is_new_user:
         return {"message": f"User created & Email Sent! Enrolled in {len(enrolled)} courses.", "email_status": email_status}
@@ -937,8 +935,6 @@ async def bulk_admit_students(file: UploadFile = File(...), course_id: int = For
         touched_ids.append(student.id)
     
     await db.commit()
-    if touched_ids:
-        await grant_published_courses(db, user_ids=touched_ids)
     return {
         "message": f"Enrolled {count} students. {len(failed)} new accounts were not created because the welcome email failed.",
         "failed_emails": failed,
@@ -1692,8 +1688,6 @@ async def publish_course(course_id: int, body: PublishRequest = Body(default_fac
     course = await load_owned_course(course_id, current_user, db)
     course.is_published = body.is_published
     await db.commit()
-    if course.is_published:
-        await grant_published_courses(db, course_id=course.id)
     return {"message": "Published" if course.is_published else "Hidden", "is_published": course.is_published}
 
 @app.get("/api/v1/library/items")
@@ -2085,40 +2079,7 @@ async def generate_pdf_endpoint(course_id: int, db: AsyncSession = Depends(get_d
     )
     return StreamingResponse(pdf, media_type="application/pdf")
 
-async def grant_published_courses(db: AsyncSession, user_ids: list[int] | None = None, course_id: int | None = None):
-    """Enrol students in published free courses. Paid courses stay on Razorpay checkout."""
-    course_query = select(models.Course.id, models.Course.price).where(models.Course.is_published == True)
-    if course_id is not None:
-        course_query = course_query.where(models.Course.id == course_id)
-    rows = (await db.execute(course_query)).all()
-    published_ids = [row[0] for row in rows if int(row[1] or 0) <= 0]
-    if not published_ids:
-        return 0
-    if user_ids is None:
-        user_ids = list((await db.execute(select(models.User.id).where(models.User.role == "student"))).scalars().all())
-    if not user_ids:
-        return 0
-    existing = await db.execute(
-        select(models.Enrollment.user_id, models.Enrollment.course_id).where(
-            models.Enrollment.user_id.in_(user_ids),
-            models.Enrollment.course_id.in_(published_ids),
-        )
-    )
-    already = {(row[0], row[1]) for row in existing.all()}
-    added = 0
-    for uid in user_ids:
-        for cid in published_ids:
-            if (uid, cid) in already:
-                continue
-            db.add(models.Enrollment(user_id=uid, course_id=cid, enrollment_type="paid"))
-            added += 1
-    if added:
-        await db.commit()
-    return added
-
 async def enrolled_courses_for(db: AsyncSession, current_user: models.User):
-    if current_user.role == "student":
-        await grant_published_courses(db, user_ids=[current_user.id])
     # 1. Fetch enrollments with course details AND certificates
     res = await db.execute(
         select(models.Enrollment)
