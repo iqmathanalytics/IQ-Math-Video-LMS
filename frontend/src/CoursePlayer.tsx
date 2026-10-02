@@ -11,7 +11,7 @@ import {
     Zap, CheckSquare, Square, CheckCheck, Award, Edit, AlertTriangle, LockKeyhole, Cloud, Link as ResourceLinkIcon // <--- Added 'Cloud' icon here
 } from "lucide-react";
 import { CODE_TEMPLATES } from './utils/codeTemplates';
-import { withPaymentMethods } from './utils/razorpay';
+import { razorpayKeyId, razorpayPaylink, withPaymentMethods } from './utils/razorpay';
 import { youtubeIdFromLink } from './utils/youtube';
 
 
@@ -994,7 +994,7 @@ const CoursePlayer = () => {
         err?.response?.data?.detail || err?.response?.data?.message || err?.message || fallback;
 
     const brand = { blue: "#005EB8", green: "#87C232", textMain: "#0f172a", textLight: "#64748b" };
-    const RAZORPAY_PAYLINK_URL = import.meta.env.VITE_RAZORPAY_PAYLINK_URL;
+    const RAZORPAY_PAYLINK_URL = razorpayPaylink();
 
     const handlePayment = async () => {
         try {
@@ -1009,9 +1009,9 @@ const CoursePlayer = () => {
 
             const orderUrl = `${API_BASE_URL}/create-order`;
             const token = localStorage.getItem("token");
-            const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID;
-            if (!razorpayKey || String(razorpayKey).includes("replace_me")) {
-                triggerToast("Set a valid VITE_RAZORPAY_KEY_ID in frontend/.env", "error");
+            const razorpayKey = razorpayKeyId();
+            if (!razorpayKey) {
+                triggerToast("Razorpay checkout is not available right now.", "error");
                 return;
             }
 

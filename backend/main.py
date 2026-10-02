@@ -12,7 +12,7 @@ from typing import List, Optional, Dict, Any, Tuple
 import models
 from database import engine, get_db, AsyncSessionLocal # Importing the Async engine and dependency
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 import requests
 import hashlib
 import io
@@ -93,6 +93,8 @@ async def init_models():
                 ("users", "last_login", "last_login TIMESTAMP"),
                 ("notifications", "is_read", "is_read BOOLEAN DEFAULT 0"),
                 ("content_items", "resource_links", "resource_links TEXT"),
+                ("course_assessments", "file_data", "file_data BLOB"),
+                ("submissions", "file_data", "file_data BLOB"),
             ):
                 try:
                     await sqlite_add(table, column, definition)
@@ -112,6 +114,8 @@ async def init_models():
             await conn.execute(text("ALTER TABLE content_items ADD COLUMN IF NOT EXISTS resource_links TEXT;"))
             await conn.execute(text("ALTER TABLE courses MODIFY description TEXT;"))
             await conn.execute(text("ALTER TABLE content_items MODIFY content TEXT;"))
+            await conn.execute(text("ALTER TABLE course_assessments ADD COLUMN IF NOT EXISTS file_data LONGBLOB;"))
+            await conn.execute(text("ALTER TABLE submissions ADD COLUMN IF NOT EXISTS file_data LONGBLOB;"))
             
             print("Database migrations applied successfully.")
         except Exception as e:
@@ -262,8 +266,15 @@ def razorpay_failure(exc: Exception) -> HTTPException:
         return HTTPException(status_code=502, detail="The Razorpay service could not be reached. Try the payment again in a moment.")
     return HTTPException(status_code=502, detail="Razorpay did not create the order. Check the live key and secret, then try again.")
 
+def configured_secret(name: str) -> str:
+    value = (os.getenv(name) or "").strip()
+    lowered = value.lower()
+    if not value or lowered in {"replace_me", "change_me"} or lowered.startswith("your_"):
+        return ""
+    return value
+
 # --- ✨ GEMINI AI ---
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_API_KEY = configured_secret("GEMINI_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
@@ -499,6 +510,13 @@ def guess_mime(filename: str) -> str:
     guessed, _ = mimetypes.guess_type(filename or "")
     return guessed or "application/octet-stream"
 
+def file_attachment(data: bytes, filename: str) -> Response:
+    return Response(
+        content=data,
+        media_type=guess_mime(filename),
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
 def safe_storage_name(user_id: int, original: str, suffix_hint: str = "") -> str:
     base = os.path.basename(original or "upload")
     base = re.sub(r"[^A-Za-z0-9._-]", "_", base)[:80] or "upload"
@@ -599,7 +617,7 @@ def generate_random_password(length=8):
 
 def send_credentials_email(to_email: str, name: str, password: str = None, subject: str = None, body: str = None):
     # 1. Get Config
-    api_key = os.getenv("BREVO_API_KEY")
+    api_key = configured_secret("BREVO_API_KEY")
     sender_email = os.getenv("EMAIL_SENDER")
     
     print(f"[BREVO API] Preparing to send to: {to_email}")
@@ -929,7 +947,7 @@ async def bulk_admit_students(file: UploadFile = File(...), course_id: int = For
 @app.post("/api/v1/ai/generate-challenge")
 async def generate_problem_content(req: AIGenerateRequest, current_user: models.User = Depends(require_instructor)):
     if not GEMINI_API_KEY or model is None:
-        raise HTTPException(status_code=500, detail="API Key missing")
+        raise HTTPException(status_code=503, detail="Set a real GEMINI_API_KEY on the API service. A placeholder value cannot generate challenges.")
     try:
         prompt = f"""Create a programming challenge on "{req.title}". OUTPUT JSON ONLY: {{ "description": "...", "test_cases": [ {{"input": "...", "output": "...", "hidden": false}} ] }}"""
         response = await asyncio.to_thread(model.generate_content, prompt)
@@ -2421,7 +2439,8 @@ async def submit_assignment(file: UploadFile = File(...), lesson_title: str = Fo
             user_id=current_user.id, 
             content_item_id=assignment_data.id, 
             drive_link=f"Uploaded: {safe_filename}", 
-            status="Submitted"
+            status="Submitted",
+            file_data=content,
         )
         db.add(new_sub)
 
@@ -2913,6 +2932,8 @@ async def submit_course_assessment(
         saved_name = f"{current_user.id}_{course_id}_{int(datetime.utcnow().timestamp())}{ext}"
         with open(os.path.join(folder, saved_name), "wb") as handle:
             handle.write(content)
+    else:
+        content = b""
     if not saved_name and not folder_link.startswith(("http://", "https://")):
         raise HTTPException(status_code=400, detail="Upload a file or paste a project folder link.")
 
@@ -2926,6 +2947,7 @@ async def submit_course_assessment(
         db.add(row)
     if saved_name:
         row.file_name = saved_name
+        row.file_data = content
     if folder_link:
         row.link = folder_link
     row.submitted_at = datetime.utcnow()
@@ -3555,6 +3577,9 @@ async def download_submission_file(submission_id: int, db: AsyncSession = Depend
     if not pair:
         raise HTTPException(status_code=404, detail="Assignment not found")
     await load_owned_course(pair[0].id, current_user, db)
+    if sub.file_data:
+        name = os.path.basename((sub.drive_link or "").replace("Uploaded:", "").strip()) or "submission"
+        return file_attachment(bytes(sub.file_data), name)
     name = os.path.basename((sub.drive_link or "").replace("Uploaded:", "").strip())
     if not name:
         raise HTTPException(status_code=404, detail="No file is stored for this submission")
@@ -3595,6 +3620,8 @@ async def download_assessment_file(file_name: str, db: AsyncSession = Depends(ge
     if not row:
         raise HTTPException(status_code=404, detail="File not found")
     await load_owned_course(row.course_id, current_user, db)
+    if row.file_data:
+        return file_attachment(bytes(row.file_data), safe_name)
     path = os.path.join(os.path.dirname(__file__), "assessment_uploads", safe_name)
     if not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="File not found")

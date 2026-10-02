@@ -1,4 +1,5 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime, Text, JSON
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, LargeBinary, String, DateTime, Text, JSON
+from sqlalchemy.dialects.mysql import LONGBLOB
 from sqlalchemy.orm import relationship
 from database import Base
 from datetime import datetime
@@ -88,6 +89,7 @@ class Submission(Base):
     drive_link = Column(String(1000))
     status = Column(String(32), default="Pending")
     submitted_at = Column(DateTime, default=datetime.utcnow)
+    file_data = Column(LargeBinary().with_variant(LONGBLOB(), "mysql"), nullable=True)
     
     student = relationship("User", back_populates="submissions")
     assignment = relationship("ContentItem")
@@ -157,6 +159,7 @@ class CourseAssessment(Base):
     link = Column(String(1000), default="")
     file_name = Column(String(255), default="")
     submitted_at = Column(DateTime, default=datetime.utcnow)
+    file_data = Column(LargeBinary().with_variant(LONGBLOB(), "mysql"), nullable=True)
 
 class CourseChallenge(Base):
     __tablename__ = "course_challenges"

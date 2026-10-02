@@ -19,6 +19,7 @@ import * as blazeface from "@tensorflow-models/blazeface";
 import "@tensorflow/tfjs-backend-webgl";
 import BrandLogo from "./components/BrandLogo";
 import { CODE_TEMPLATES } from './utils/codeTemplates';
+import { razorpayKeyId, razorpayPaylink } from './utils/razorpay';
 import { clearSession, getValidSession } from "./utils/session";
 
 // --- TYPES ---
@@ -171,7 +172,7 @@ const CourseCard = ({ course, type, navigate, handleFreeEnroll, openEnrollModal,
 
 const StudentDashboard = () => {
     const navigate = useNavigate();
-    const RAZORPAY_PAYLINK_URL = import.meta.env.VITE_RAZORPAY_PAYLINK_URL;
+    const RAZORPAY_PAYLINK_URL = razorpayPaylink();
     const [activeTab, setActiveTab] = useState("home");
 
     // ✅ NEW: Sub-tab for My Learning (Standard vs Coding)
@@ -721,9 +722,9 @@ const StudentDashboard = () => {
             } else {
                 const isLoaded = await loadRazorpayScript();
                 if (!isLoaded) { triggerToast("SDK Failed to load", "error"); return; }
-                const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID;
-                if (!razorpayKey || String(razorpayKey).includes("replace_me")) {
-                    triggerToast("Set a valid VITE_RAZORPAY_KEY_ID in frontend/.env", "error");
+                const razorpayKey = razorpayKeyId();
+                if (!razorpayKey) {
+                    triggerToast("Razorpay checkout is not available right now.", "error");
                     return;
                 }
 

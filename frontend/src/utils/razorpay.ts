@@ -1,8 +1,15 @@
-export const razorpayKeyId = () => {
-  const key = import.meta.env.VITE_RAZORPAY_KEY_ID;
-  if (!key || String(key).includes("replace_me")) return "";
-  return String(key);
+const PRODUCTION_RAZORPAY_KEY_ID = "rzp_test_TiLwM8zI9XqrMI";
+const PRODUCTION_PAYLINK = "https://razorpay.me/@iqmathtechnologies";
+
+const usable = (value: unknown, fallback: string) => {
+  const text = String(value ?? "").trim();
+  if (!text || text.includes("replace_me") || text.startsWith("your_")) return fallback;
+  return text;
 };
+
+export const razorpayKeyId = () => usable(import.meta.env.VITE_RAZORPAY_KEY_ID, PRODUCTION_RAZORPAY_KEY_ID);
+
+export const razorpayPaylink = () => usable(import.meta.env.VITE_RAZORPAY_PAYLINK_URL, PRODUCTION_PAYLINK);
 
 /** UPI, cards, netbanking, and wallets for a paid course. */
 export const withPaymentMethods = <T extends object>(options: T) => ({
