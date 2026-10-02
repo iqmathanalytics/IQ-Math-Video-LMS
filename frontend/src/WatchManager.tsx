@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import axios from "axios";
 import API_BASE_URL from "./config";
 import { getValidSession } from "./utils/session";

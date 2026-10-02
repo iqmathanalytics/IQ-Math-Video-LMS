@@ -6,8 +6,7 @@ import type { DropResult } from "@hello-pangea/dnd"; import API_BASE_URL from '.
 import {
   ArrowLeft, Trash2, Edit2, Video, FileText,
   Code, HelpCircle, FileQuestion, ChevronDown, ChevronRight,
-  CheckCircle, X, AlertTriangle, GripVertical, Radio, Zap,
-  Check
+  CheckCircle, X, AlertTriangle, GripVertical, Radio, Zap
 } from "lucide-react";
 
 // --- Types ---

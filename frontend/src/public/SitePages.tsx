@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import PublicShell from "./PublicShell";
 import { COURSES, PATHS, type Topic } from "./catalog";

@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
 import API_BASE_URL from "../config";
@@ -178,7 +178,7 @@ export const CourseCatalog = () => {
         return;
       }
       const order = await axios.post(`${API_BASE_URL}/create-order`, { course_id: course.id }, { headers: headers() });
-      const RazorpayCheckout = (window as Window & { Razorpay: new (options: object) => { open: () => void } }).Razorpay;
+      const RazorpayCheckout = (window as unknown as { Razorpay: new (options: object) => { open: () => void } }).Razorpay;
       const checkout = new RazorpayCheckout(withPaymentMethods({
         key: razorpayKey,
         amount: order.data.amount,
