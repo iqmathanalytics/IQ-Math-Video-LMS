@@ -11,6 +11,20 @@ export const razorpayKeyId = () => usable(import.meta.env.VITE_RAZORPAY_KEY_ID, 
 
 export const razorpayPaylink = () => usable(import.meta.env.VITE_RAZORPAY_PAYLINK_URL, PRODUCTION_PAYLINK);
 
+export const ensureRazorpay = () => new Promise<void>((resolve, reject) => {
+  const host = window as Window & { Razorpay?: unknown };
+  if (host.Razorpay) {
+    resolve();
+    return;
+  }
+  const script = document.createElement("script");
+  script.src = "https://checkout.razorpay.com/v1/checkout.js";
+  script.async = true;
+  script.onload = () => resolve();
+  script.onerror = () => reject(new Error("Razorpay checkout did not load."));
+  document.head.appendChild(script);
+});
+
 /** UPI, cards, netbanking, and wallets for a paid course. */
 export const withPaymentMethods = <T extends object>(options: T) => ({
   ...options,

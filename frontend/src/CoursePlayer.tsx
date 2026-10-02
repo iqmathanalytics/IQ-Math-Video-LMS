@@ -11,7 +11,7 @@ import {
     Zap, CheckSquare, Square, CheckCheck, Award, Edit, AlertTriangle, LockKeyhole, Cloud, Link as ResourceLinkIcon // <--- Added 'Cloud' icon here
 } from "lucide-react";
 import { CODE_TEMPLATES } from './utils/codeTemplates';
-import { razorpayKeyId, razorpayPaylink, withPaymentMethods } from './utils/razorpay';
+import { ensureRazorpay, razorpayKeyId, razorpayPaylink, withPaymentMethods } from './utils/razorpay';
 import { youtubeIdFromLink } from './utils/youtube';
 
 
@@ -1049,6 +1049,7 @@ const CoursePlayer = () => {
                 },
                 theme: { color: "#1d7a34" },
             });
+            await ensureRazorpay();
             const rzp1 = new (window as any).Razorpay(options);
             rzp1.open();
         } catch (error: any) {

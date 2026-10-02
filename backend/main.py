@@ -172,7 +172,7 @@ async def ensure_demo_users():
             session.add(models.User(
                 email=email,
                 full_name=name,
-                hashed_password=get_password_hash("password123"),
+                hashed_password=await asyncio.to_thread(get_password_hash, "password123"),
                 role=role,
                 phone_number=phone,
                 is_active=True,
@@ -200,13 +200,15 @@ async def keep_db_warm():
 @app.on_event("startup")
 async def on_startup():
     global _db_warm_task
-    await init_models()
-    await ensure_sample_watch()
-    await ensure_demo_users()
-    try:
-        await warm_db_pool()
-    except Exception as exc:
-        print(f"Database warmup skipped: {exc}")
+    async def prepare():
+        try:
+            await init_models()
+            await ensure_sample_watch()
+            await ensure_demo_users()
+            await warm_db_pool()
+        except Exception as exc:
+            print(f"Database prepare: {exc}")
+    asyncio.create_task(prepare())
     _db_warm_task = asyncio.create_task(keep_db_warm())
     token_manager.start()
 
@@ -665,7 +667,7 @@ def send_credentials_email(to_email: str, name: str, password: str = None, subje
 
     # 5. Send Request
     try:
-        response = requests.post(url, json=payload, headers=headers, timeout=10)
+        response = requests.post(url, json=payload, headers=headers, timeout=4)
         
         if response.status_code == 201:
             print(f"[BREVO API] SUCCESS: Email sent! ID: {response.json().get('messageId')}")
@@ -775,7 +777,7 @@ async def create_user(request: Request, user: UserCreate, db: AsyncSession = Dep
     
     new_user = models.User(
         email=user.email, 
-        hashed_password=get_password_hash(user.password), 
+        hashed_password=await asyncio.to_thread(get_password_hash, user.password), 
         full_name=user.name, 
         role="student",
         phone_number=user.phone_number
@@ -819,7 +821,7 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
     result = await db.execute(select(models.User).where(models.User.email == form_data.username))
     user = result.scalars().first()
     
-    if not user or not verify_password(form_data.password, user.hashed_password):
+    if not user or not await asyncio.to_thread(verify_password, form_data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
 
     if user.is_active is False:
@@ -858,7 +860,7 @@ async def admit_single_student(req: AdmitStudentRequest, db: AsyncSession = Depe
         student = models.User(
             email=req.email, 
             full_name=req.full_name, 
-            hashed_password=get_password_hash(final_password), 
+            hashed_password=await asyncio.to_thread(get_password_hash, final_password), 
             role="student",
         )
         db.add(student)
@@ -917,7 +919,7 @@ async def bulk_admit_students(file: UploadFile = File(...), course_id: int = For
             student = models.User(
                 email=email, 
                 full_name=name, 
-                hashed_password=get_password_hash(bulk_password), 
+                hashed_password=await asyncio.to_thread(get_password_hash, bulk_password), 
                 role="student"
             )
             db.add(student)
@@ -1377,7 +1379,8 @@ async def get_courses(db: AsyncSession = Depends(get_db), current_user: models.U
     return [course_brief(course) for course in res.scalars().all()]
 
 @app.get("/api/v1/public/courses")
-async def public_courses(db: AsyncSession = Depends(get_db)):
+async def public_courses(response: Response, db: AsyncSession = Depends(get_db)):
+    response.headers["Cache-Control"] = "public, max-age=30"
     res = await db.execute(select(models.Course).where(models.Course.is_published == True).order_by(models.Course.id.desc()))
     rows = []
     for course in res.scalars().all():
@@ -2192,7 +2195,7 @@ async def change_password(req: PasswordChange, db: AsyncSession = Depends(get_db
         raise HTTPException(status_code=400, detail="Use at least 8 characters.")
     if not verify_password(req.current_password, current_user.hashed_password):
         raise HTTPException(status_code=400, detail="Current password is incorrect.")
-    current_user.hashed_password = get_password_hash(req.new_password)
+    current_user.hashed_password = await asyncio.to_thread(get_password_hash, req.new_password)
     await db.commit()
     return {"message": "Password updated"}
 
@@ -2596,7 +2599,7 @@ async def reset_student_password(user_id: int, req: AdminPasswordReset, db: Asyn
     if len(req.new_password or "") < 8:
         raise HTTPException(status_code=400, detail="Use at least 8 characters.")
     
-    student.hashed_password = get_password_hash(req.new_password)
+    student.hashed_password = await asyncio.to_thread(get_password_hash, req.new_password)
     await db.commit()
     
     return {"message": f"Password for {student.full_name} has been reset."}
@@ -2675,7 +2678,8 @@ def watch_lesson_out(row: models.WatchLesson) -> dict:
     return {"id": row.id, "title": row.title, "youtube_id": row.youtube_id}
 
 @app.get("/api/v1/watch")
-async def list_watch_lessons(db: AsyncSession = Depends(get_db)):
+async def list_watch_lessons(response: Response, db: AsyncSession = Depends(get_db)):
+    response.headers["Cache-Control"] = "public, max-age=30"
     res = await db.execute(select(models.WatchLesson).order_by(models.WatchLesson.id.desc()))
     return [watch_lesson_out(row) for row in res.scalars().all()]
 
@@ -3523,7 +3527,7 @@ async def reset_password(request: Request, body: ResetIn, db: AsyncSession = Dep
     user = user_res.scalars().first()
     if not user or user.is_active is False:
         raise HTTPException(status_code=400, detail="This reset link is invalid or has expired.")
-    user.hashed_password = get_password_hash(body.new_password)
+    user.hashed_password = await asyncio.to_thread(get_password_hash, body.new_password)
     row.used = True
     await db.commit()
     return {"message": "Password updated. Sign in with the new password."}

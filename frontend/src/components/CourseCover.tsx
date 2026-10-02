@@ -29,6 +29,7 @@ const CourseCover = ({ title, imageUrl, className }: Props) => {
         className="h-full w-full object-cover"
         referrerPolicy="no-referrer"
         decoding="async"
+        loading="lazy"
         onError={() => setFailed(true)}
       />
     </div>
