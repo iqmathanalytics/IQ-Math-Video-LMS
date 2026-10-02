@@ -137,7 +137,11 @@ const DashboardLayout = () => {
             <div key={group.label}>
               {(!collapsed || mobileMenuOpen) && <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.16em] iq-faint">{group.label}</p>}
               {group.items.map((item) => {
-                const isActive = location.pathname === item.path || location.pathname === item.path + "/";
+                const isActive = item.path === "/dashboard"
+                  ? location.pathname === "/dashboard"
+                  : item.path === "/dashboard/courses"
+                    ? location.pathname === item.path || location.pathname.startsWith("/dashboard/course/")
+                    : location.pathname === item.path || location.pathname.startsWith(item.path + "/");
                 return (
                   <div
                     key={item.path}
@@ -183,7 +187,12 @@ const DashboardLayout = () => {
               <Menu size={24} />
             </button>
             <h1 className="text-xl lg:text-2xl font-semibold" style={{ fontFamily: '"Space Grotesk", Inter, sans-serif' }}>
-              {menuItems.find(i => i.path === location.pathname)?.label || "Dashboard"}
+              {menuItems.find(i => i.path === location.pathname)?.label
+                || (location.pathname.includes("/builder") ? "Course builder"
+                  : location.pathname.includes("/recordings") ? "Recordings"
+                  : location.pathname.startsWith("/dashboard/settings") ? "Settings"
+                  : location.pathname.startsWith("/dashboard/course/") ? "Course"
+                  : "Dashboard")}
             </h1>
           </div>
 
@@ -202,6 +211,8 @@ const DashboardLayout = () => {
               </button>
 
               {showProfileMenu && (
+                <>
+                <button type="button" aria-label="Close account menu" className="fixed inset-0 z-[90] cursor-default bg-transparent" onClick={() => setShowProfileMenu(false)} />
                 <div className="absolute right-0 top-14 w-64 iq-surface rounded-xl shadow-2xl p-4 z-[100] border iq-line">
                   <div className="mb-4 border-b iq-line pb-4">
                     <p className="font-semibold">{instructorData.name}</p>
@@ -213,6 +224,7 @@ const DashboardLayout = () => {
                     <LogOut size={18} /> Logout
                   </button>
                 </div>
+                </>
               )}
             </div>
           </div>

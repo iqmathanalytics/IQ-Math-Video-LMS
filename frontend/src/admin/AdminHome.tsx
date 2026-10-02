@@ -73,7 +73,7 @@ const AdminHome = () => {
       <section className="rounded-2xl border iq-line iq-surface p-5">
         <h3 className="font-semibold">What students see</h3>
         <ul className="mt-3 space-y-2 text-sm iq-muted">
-          <li>A published course is added to every student account. Hiding it removes it from learner lists.</li>
+          <li>Publishing a course shows it in the catalogue. A learner joins it from that list, or from an instructor admission.</li>
           <li>Watch lessons stay on IQNex. Students open their courses after they sign in.</li>
           <li>A certificate can be downloaded after the course assessments are submitted.</li>
         </ul>
