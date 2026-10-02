@@ -137,53 +137,66 @@ python seed_student.py
 
 ---
 
-## Deploy on Render
+## Deploy
 
-Production uses the Blueprint in `render.yaml`. It creates two services. Secret values are not stored in the repo. Copy them from your local `backend/.env` and `frontend/.env` into the Render Dashboard when the Blueprint asks for each `sync: false` key.
+The API runs on Render. The site runs on Cloudflare Pages. The database stays on the host already in `DATABASE_URL` (TiDB Cloud or PostgreSQL). Render does not create a database.
 
-Dashboard link (works after `render.yaml` is on `main`):
+Paste secret values without the quotation marks from the `.env` files. `VITE_*` values are baked in when Cloudflare builds the site, so changing them requires a new frontend deploy.
 
-https://dashboard.render.com/blueprint/new?repo=https://github.com/iqmathanalytics/IQ-Math-Video-LMS
+### 1. Push the repo
 
-### Services
+Commit these deployment files and push `main` to GitHub:
 
-| Service | Type | Root | Build | Start / publish |
-| --- | --- | --- | --- | --- |
-| `iqmath-backend` | Python web, free, Oregon | `backend` | `pip install -r requirements.txt` | `uvicorn main:app --host 0.0.0.0 --port $PORT` |
-| `iqmath-frontend` | Static site, Node 20 | `frontend` | `npm ci && npm run build` | `frontend/dist` |
+- `render.yaml` (API only)
+- `frontend/public/_redirects` (keeps client-side routes working)
+- `frontend/public/_headers`
 
-The API health check is `/docs`. The site rewrites unknown paths to `/index.html` so client-side routes keep working.
+### 2. Create the Render API
 
-The database stays on TiDB Cloud or your existing PostgreSQL host. Render does not create a new database. `DATABASE_URL` is the same connection string as in `backend/.env`.
-
-### Backend environment (`iqmath-backend`)
-
-Set these in the Render Dashboard. Non-secret values are already in `render.yaml`.
+1. Sign in at https://dashboard.render.com and connect the GitHub repo.
+2. **New → Blueprint**, point it at this repo, and apply `render.yaml`. That creates the web service `iqmath-backend` (Python, root directory `backend`, Oregon).
+3. When the form asks for secrets, copy them from `backend/.env` **without quotes**:
 
 | Key | Value |
 | --- | --- |
-| `PYTHON_VERSION` | `3.12.8` (set by the Blueprint) |
-| `SECRET_KEY` | from `backend/.env` |
-| `ALGORITHM` | `HS256` |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | `60` |
-| `DATABASE_URL` | TiDB or PostgreSQL URL from `backend/.env` |
-| `RAZORPAY_KEY_ID` | from `backend/.env` |
-| `RAZORPAY_KEY_SECRET` | from `backend/.env` |
-| `GEMINI_API_KEY` | from `backend/.env` |
-| `EMAIL_SENDER` | from `backend/.env` |
-| `BREVO_API_KEY` | from `backend/.env` |
-| `JUDGE0_API_KEY` | from `backend/.env` |
-| `JUDGE0_API_HOST` | `judge0-ce.p.rapidapi.com` |
-| `AWS_LAMBDA_URL` | compiler Function URL from `backend/.env` |
+| `SECRET_KEY` | long random string, not `change_me` |
+| `DATABASE_URL` | TiDB or PostgreSQL URL. It must be reachable from the internet, not `localhost` |
+| `FRONTEND_URL` | leave blank until Cloudflare gives you a URL, then set it with no trailing slash |
+| `ALLOWED_ORIGINS` | same Cloudflare origin, or several separated by commas: `https://your-app.pages.dev,https://www.yourdomain.com` |
+| `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | live Razorpay key pair |
+| `GEMINI_API_KEY` | Gemini key |
+| `EMAIL_SENDER` / `BREVO_API_KEY` | Brevo sender and API key |
+| `AWS_LAMBDA_URL` | compiler Function URL |
 
-### Frontend environment (`iqmath-frontend`)
+Non-secret keys (`PYTHON_VERSION`, `ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES`) are already in `render.yaml`.
 
-Vite reads these at **build** time. After you change any `VITE_*` value, save with **Save, rebuild, and deploy**.
+4. Open **Logs** and wait until the deploy is live.
+5. Open `https://<service>.onrender.com/` and confirm JSON like `{"status":"online",...}`. Docs stay at `/docs`.
+
+The start command binds `$PORT` and trusts Render's proxy headers. The service creates missing tables on startup, so a separate migration step is not required for a first deploy.
+
+Free instances sleep after 15 minutes without requests. The first request after that can take about a minute. Use a paid plan when the site needs to stay awake.
+
+Uploaded assessment files live on the instance disk and disappear on the next deploy. Keep course media on YouTube or another durable store.
+
+### 3. Create the Cloudflare Pages site
+
+1. In https://dash.cloudflare.com go to **Workers & Pages → Create → Pages → Connect to Git**.
+2. Select this repo and set:
+
+| Setting | Value |
+| --- | --- |
+| Production branch | `main` |
+| Root directory | `frontend` |
+| Build command | `npm ci && npm run build` |
+| Build output directory | `dist` |
+| Node.js version | `20` (`NODE_VERSION=20` under Environment variables) |
+
+3. Add these **build** environment variables for Production (and Preview if you use it). Copy Firebase and Razorpay values from `frontend/.env`, without quotes.
 
 | Key | Value |
 | --- | --- |
-| `NODE_VERSION` | `20` (set by the Blueprint) |
-| `VITE_API_URL` | `https://<iqmath-backend>.onrender.com/api/v1` |
+| `VITE_API_URL` | `https://<service>.onrender.com/api/v1` |
 | `VITE_RAZORPAY_KEY_ID` | same public key as `RAZORPAY_KEY_ID` |
 | `VITE_RAZORPAY_PAYLINK_URL` | `https://razorpay.me/iqmathtechnologies` |
 | `VITE_FIREBASE_API_KEY` | from `frontend/.env` |
@@ -194,17 +207,17 @@ Vite reads these at **build** time. After you change any `VITE_*` value, save wi
 | `VITE_FIREBASE_APP_ID` | from `frontend/.env` |
 | `VITE_FIREBASE_MEASUREMENT_ID` | from `frontend/.env` |
 
-Use the backend URL Render assigns after the API service is created. It must end with `/api/v1`.
+`VITE_API_URL` must end with `/api/v1`.
 
-Firebase project: https://console.firebase.google.com/project/iqmath-lms/overview
+4. Deploy. Cloudflare assigns `https://<project>.pages.dev`.
 
-### Apply the Blueprint
+### 4. Point the API at that site
 
-1. Push `render.yaml` to `main` on GitHub.
-2. Open the Dashboard link above and connect the `iqmathanalytics/IQ-Math-Video-LMS` repo if Render asks.
-3. Fill every secret the form lists. Use the tables above.
-4. Click **Apply**.
-5. When the backend URL is live, set `VITE_API_URL` on `iqmath-frontend` and rebuild that static site.
-6. Open `https://<iqmath-backend>.onrender.com/docs` and confirm it loads. Then open the frontend URL and sign in.
+1. On Render, set `FRONTEND_URL` and `ALLOWED_ORIGINS` to `https://<project>.pages.dev` (add a custom domain too, if you attach one).
+2. Save. Render restarts the API. No frontend rebuild is required for this step.
+3. In Firebase Authentication → Settings → **Authorized domains**, add `<project>.pages.dev` and any custom domain: https://console.firebase.google.com/project/iqmath-lms/authentication/settings
+4. Open the Pages URL, sign in, and open a course. A CORS error in the browser means `ALLOWED_ORIGINS` does not match the exact site origin, including `https://`.
 
-Free web services sleep after inactivity. The first request after sleep can take up to a minute.
+### 5. Optional custom domain
+
+In Cloudflare Pages → **Custom domains**, add the domain. Add the same hostname to `ALLOWED_ORIGINS` and to Firebase authorized domains, then restart the API.

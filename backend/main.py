@@ -213,9 +213,21 @@ async def on_shutdown():
     token_manager.stop()
 
 # 2. CONFIG: CORS POLICY
-# Credentials and a wildcard origin cannot be combined. Set ALLOWED_ORIGINS in production.
-_default_origins = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173"
-_origins = [item.strip() for item in os.getenv("ALLOWED_ORIGINS", _default_origins).split(",") if item.strip()]
+# Credentials and a wildcard origin cannot be combined.
+# Set ALLOWED_ORIGINS (comma-separated) and FRONTEND_URL to the Cloudflare site.
+def _cors_origins() -> list[str]:
+    defaults = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173"
+    origins = [
+        item.strip().rstrip("/")
+        for item in os.getenv("ALLOWED_ORIGINS", defaults).split(",")
+        if item.strip()
+    ]
+    frontend = os.getenv("FRONTEND_URL", "").strip().rstrip("/")
+    if frontend and frontend not in origins:
+        origins.append(frontend)
+    return origins
+
+_origins = _cors_origins()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_origins,

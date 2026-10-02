@@ -10,6 +10,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+def _unwrap_quoted_env() -> None:
+    """Render pastes often keep the quotes from a .env file. Strip one matching pair."""
+    for key, value in list(os.environ.items()):
+        if not value:
+            continue
+        stripped = value.strip()
+        if len(stripped) >= 2 and stripped[0] == stripped[-1] and stripped[0] in {'"', "'"}:
+            os.environ[key] = stripped[1:-1]
+
+_unwrap_quoted_env()
+
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 if not DATABASE_URL:

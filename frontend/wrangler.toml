@@ -1,0 +1,5 @@
+# Optional Cloudflare Pages config when deploying with Wrangler from frontend/.
+# Git deploys in the Cloudflare dashboard can ignore this and use the build settings there.
+name = "iqmath-frontend"
+pages_build_output_dir = "./dist"
+compatibility_date = "2026-10-02"
