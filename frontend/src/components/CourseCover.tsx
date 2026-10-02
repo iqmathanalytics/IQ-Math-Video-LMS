@@ -1,28 +1,35 @@
+import { useState } from "react";
+import { courseImageSrc } from "../utils/courseImage";
+
 type Props = {
   title: string;
   imageUrl?: string | null;
+  className?: string;
 };
 
-const CourseCover = ({ title, imageUrl }: Props) => {
+const CourseCover = ({ title, imageUrl, className }: Props) => {
   const letter = (title || "C").trim().charAt(0).toUpperCase() || "C";
-  if (!imageUrl) {
+  const src = courseImageSrc(imageUrl);
+  const [failed, setFailed] = useState(false);
+  const frame = `aspect-video w-full overflow-hidden bg-[var(--iq-inset,#e8eef5)] ${className ?? "rounded-xl"}`;
+
+  if (!src || failed) {
     return (
-      <div className="flex aspect-video w-full items-center justify-center rounded-xl text-3xl font-semibold text-white" style={{ background: "#005EB8" }} aria-hidden>
+      <div className={`flex items-center justify-center text-3xl font-semibold text-white ${frame}`} style={{ background: "#005EB8" }} aria-hidden>
         {letter}
       </div>
     );
   }
+
   return (
-    <div className="aspect-video w-full overflow-hidden rounded-xl bg-slate-200">
+    <div className={frame}>
       <img
-        src={imageUrl}
+        src={src}
         alt=""
         className="h-full w-full object-cover"
-        onError={(event) => {
-          event.currentTarget.style.display = "none";
-          const parent = event.currentTarget.parentElement;
-          if (parent) parent.textContent = letter;
-        }}
+        referrerPolicy="no-referrer"
+        decoding="async"
+        onError={() => setFailed(true)}
       />
     </div>
   );

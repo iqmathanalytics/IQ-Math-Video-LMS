@@ -19,6 +19,8 @@ import {
   X,
 } from "lucide-react";
 import BrandLogo from "./components/BrandLogo";
+import CourseCover from "./components/CourseCover";
+import CourseFacts from "./components/CourseFacts";
 import { FAQS } from "./public/catalog";
 import { useDayTheme } from "./public/useDayTheme";
 import API_BASE_URL from "./config";
@@ -61,7 +63,7 @@ const journey = [
 ];
 
 type WatchLesson = { id: number; title: string; youtube_id: string };
-type LiveCourse = { id: number; title: string; description: string; price: number };
+type LiveCourse = { id: number; title: string; description: string; price: number; image_url?: string | null };
 
 const Reveal = ({ children, className = "", delay = 0, as: Tag = "div" }: { children: ReactNode; className?: string; delay?: number; as?: "div" | "li" }) => {
   const ref = useRef<HTMLDivElement | HTMLLIElement>(null);
@@ -292,13 +294,16 @@ const LandingPage = () => {
               ))}
             </ul>
             {courses.length > 0 && (
-              <ul className="mt-8 grid gap-3 md:grid-cols-2">
+              <ul className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {courses.map((course) => (
-                  <li key={course.id} className="rounded-2xl border iq-line p-5">
-                    <p className="text-xs uppercase tracking-[0.14em] iq-faint">{Number(course.price) > 0 ? `₹${course.price}` : "Free"}</p>
-                    <h3 className="mt-2 font-semibold">{course.title}</h3>
-                    <p className="mt-2 text-sm iq-muted">{course.description}</p>
-                    <Link to="/login" className="mt-3 inline-block text-sm font-semibold iq-link">Sign in to enrol</Link>
+                  <li key={course.id} className="flex flex-col overflow-hidden rounded-2xl border iq-line iq-surface">
+                    <CourseCover title={course.title} imageUrl={course.image_url} className="rounded-none" />
+                    <div className="flex flex-1 flex-col p-5">
+                      <p className="text-xs uppercase tracking-[0.14em] iq-faint">{Number(course.price) > 0 ? `₹${course.price}` : "Free"}</p>
+                      <h3 className="mt-2 font-semibold">{course.title}</h3>
+                      <CourseFacts description={course.description} />
+                      <Link to="/login" className="mt-auto pt-4 inline-block text-sm font-semibold iq-link">Sign in to enrol</Link>
+                    </div>
                   </li>
                 ))}
               </ul>

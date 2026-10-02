@@ -4,6 +4,7 @@ import axios from "axios";
 import API_BASE_URL from "../config";
 import { getValidSession } from "../utils/session";
 import { useDayTheme } from "../public/useDayTheme";
+import CourseCover from "../components/CourseCover";
 
 type UploadedCourse = {
   id: number;
@@ -108,15 +109,10 @@ const CourseDesk = () => {
 
       <ul className="mt-6 grid gap-4 md:grid-cols-2">
         {shown.map((course) => (
-          <li key={course.id} className="rounded-2xl border iq-line iq-surface p-4">
-            <div className="aspect-video overflow-hidden rounded-xl bg-[var(--iq-inset)]">
-              {course.image_url ? (
-                <img src={course.image_url} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <div className="flex h-full items-center justify-center text-3xl font-semibold iq-muted">{(course.title || "C").charAt(0)}</div>
-              )}
-            </div>
-            <p className="mt-3 text-xs uppercase tracking-[0.14em] iq-faint">
+          <li key={course.id} className="overflow-hidden rounded-2xl border iq-line iq-surface">
+            <CourseCover title={course.title} imageUrl={course.image_url} className="rounded-none" />
+            <div className="p-4">
+            <p className="text-xs uppercase tracking-[0.14em] iq-faint">
               {course.is_published ? "Published" : "Hidden"} · {Number(course.price) > 0 ? `₹${course.price}` : "Free"} · {course.modules} modules · {course.lessons} lessons
             </p>
             <h3 className="mt-2 text-xl font-semibold">{course.title}</h3>
@@ -127,6 +123,7 @@ const CourseDesk = () => {
                 {course.is_published ? "Hide" : "Publish"}
               </button>
               <button type="button" disabled={busyId === course.id} onClick={() => setPendingDelete(course)} className="iq-btn iq-btn-danger w-full">Remove</button>
+            </div>
             </div>
           </li>
         ))}
