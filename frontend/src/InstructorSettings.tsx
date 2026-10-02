@@ -112,7 +112,7 @@ const InstructorSettings = () => {
                     </h4>
                     <p style={{ margin: 0, fontSize: "13px", color: brand.textLight }}>{toast.message}</p>
                 </div>
-                <button onClick={() => setToast(prev => ({ ...prev, show: false }))} style={{ background: "none", border: "none", cursor: "pointer", marginLeft: "10px", color: "#94a3b8" }}>
+                <button onClick={() => setToast(prev => ({ ...prev, show: false }))} style={{ background: "none", border: "none", cursor: "pointer", marginLeft: "10px", color: "var(--iq-faint)" }}>
                     <X size={16} />
                 </button>
             </div>

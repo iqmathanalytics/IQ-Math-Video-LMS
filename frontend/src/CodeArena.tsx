@@ -213,8 +213,8 @@ const CodeArena = () => {
             {/* ... (Header and List UI remains mostly the same) ... */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <div>
-                    <h1 className="text-2xl md:text-3xl font-extrabold text-[#1e293b]">Code Arena</h1>
-                    <p className="text-sm md:text-base text-[#64748b]">Create and manage coding challenges.</p>
+                    <h1 className="text-2xl font-extrabold md:text-3xl">Code Arena</h1>
+                    <p className="text-sm iq-muted md:text-base">Create and manage coding challenges.</p>
                 </div>
                 <button onClick={() => setShowModal(true)} className="w-full md:w-auto bg-[#005EB8] hover:bg-[#004a94] text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-200">
                     <Plus size={20} /> Create Challenge
@@ -271,10 +271,10 @@ const CodeArena = () => {
                         <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-[#F8FAFC] rounded-2xl shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-y-auto flex flex-col border border-[#cbd5e1]">
 
                             {/* Header */}
-                            <div className="p-6 border-b border-[#cbd5e1] flex justify-between items-center sticky top-0 bg-[#F8FAFC]/95 backdrop-blur-md z-10">
+                            <div className="sticky top-0 z-10 flex items-center justify-between border-b iq-line bg-[var(--iq-surface)] p-6">
                                 <div>
-                                    <h2 className="text-xl font-bold text-[#1e293b]">Define New Challenge</h2>
-                                    <p className="text-xs text-[#64748b] mt-1">Configure test details and add coding problems.</p>
+                                    <h2 className="text-xl font-bold">Define New Challenge</h2>
+                                    <p className="mt-1 text-xs iq-muted">Configure test details and add coding problems.</p>
                                 </div>
                                 <button onClick={() => setShowModal(false)} className="bg-white border border-[#cbd5e1] p-2 rounded-full hover:bg-red-50 hover:border-red-200 hover:text-red-500 transition-colors"><X size={20} /></button>
                             </div>
@@ -402,8 +402,8 @@ const CodeArena = () => {
 
                             <div className="p-6 border-b border-[#cbd5e1] bg-white flex justify-between items-center">
                                 <div>
-                                    <h2 className="text-xl font-bold text-[#1e293b]">Challenge Results</h2>
-                                    <p className="text-sm text-[#64748b]">{selectedTestTitle}</p>
+                                    <h2 className="text-xl font-bold">Challenge Results</h2>
+                                    <p className="text-sm iq-muted">{selectedTestTitle}</p>
                                 </div>
                                 <div className="flex gap-3">
                                     <button onClick={handleDownloadResults} className="px-4 py-2 bg-[#005EB8] text-white rounded-lg font-bold text-sm flex items-center gap-2 hover:bg-[#004a94] transition-colors">
@@ -463,12 +463,12 @@ const CodeArena = () => {
                 }}>
                     {toast.type === "success" ? <CheckCircle size={24} color="#87C232" /> : <AlertTriangle size={24} color="#ef4444" />}
                     <div>
-                        <h4 style={{ margin: "0", fontSize: "14px", fontWeight: "700", color: "#1e293b" }}>
+                        <h4 style={{ margin: "0", fontSize: "14px", fontWeight: "700", color: "var(--iq-text)" }}>
                             {toast.type === "success" ? "Success" : "Error"}
                         </h4>
-                        <p style={{ margin: 0, fontSize: "13px", color: "#64748b" }}>{toast.message}</p>
+                        <p style={{ margin: 0, fontSize: "13px", color: "var(--iq-muted)" }}>{toast.message}</p>
                     </div>
-                    <button onClick={() => setToast(prev => ({ ...prev, show: false }))} style={{ background: "none", border: "none", cursor: "pointer", marginLeft: "10px", color: "#94a3b8" }}>
+                    <button onClick={() => setToast(prev => ({ ...prev, show: false }))} style={{ background: "none", border: "none", cursor: "pointer", marginLeft: "10px", color: "var(--iq-faint)" }}>
                         <X size={16} />
                     </button>
                 </div>

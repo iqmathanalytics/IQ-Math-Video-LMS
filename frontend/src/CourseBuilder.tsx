@@ -1282,7 +1282,7 @@ const CourseBuilder = () => {
                                                 <div style={{ flex: 1 }}>
                                                     <div style={{ fontWeight: 700, color: brand.textMain, marginBottom: "3px" }}>{item.title}</div>
                                                     <div style={{ fontSize: "11px", color: brand.textLight, display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                                                        <span style={{ fontWeight: 700, textTransform: "uppercase", color: "#334155" }}>{item.type}</span>
+                                                        <span style={{ fontWeight: 700, textTransform: "uppercase", color: "var(--iq-text)" }}>{item.type}</span>
                                                         <span>Course: {item.course_title}</span>
                                                         <span>Module: {item.module_title}</span>
                                                         <span>Instructor: {item.instructor_name}</span>
@@ -1558,7 +1558,7 @@ const CourseBuilder = () => {
                                                 </button>
                                             </div>
                                         )}
-                                        {activeModal === "Assignment" && (<div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "5px" }}><input type="checkbox" id="mandatoryCheck" checked={isMandatory} onChange={(e) => setIsMandatory(e.target.checked)} style={{ width: "18px", height: "18px", cursor: "pointer" }} /><label htmlFor="mandatoryCheck" style={{ fontSize: "14px", color: "#475569", fontWeight: "600", cursor: "pointer" }}>Mark as Mandatory</label></div>)}
+                                        {activeModal === "Assignment" && (<div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "5px" }}><input type="checkbox" id="mandatoryCheck" checked={isMandatory} onChange={(e) => setIsMandatory(e.target.checked)} style={{ width: "18px", height: "18px", cursor: "pointer" }} /><label htmlFor="mandatoryCheck" style={{ fontSize: "14px", color: "var(--iq-muted)", fontWeight: "600", cursor: "pointer" }}>Mark as Mandatory</label></div>)}
                                         {activeModal === "Live Test" && (
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                                                 {/* ❌ DELETED DUPLICATE TITLE INPUT */}

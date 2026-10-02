@@ -235,12 +235,12 @@ const AssignmentManager = () => {
         }}>
           {toast.type === "success" ? <CheckCircle size={24} color="#87C232" /> : <AlertTriangle size={24} color="#ef4444" />}
           <div>
-            <h4 style={{ margin: "0", fontSize: "14px", fontWeight: "700", color: "#1e293b" }}>
+            <h4 style={{ margin: "0", fontSize: "14px", fontWeight: "700", color: "var(--iq-text)" }}>
               {toast.type === "success" ? "Success" : "Error"}
             </h4>
-            <p style={{ margin: 0, fontSize: "13px", color: "#64748b" }}>{toast.message}</p>
+            <p style={{ margin: 0, fontSize: "13px", color: "var(--iq-muted)" }}>{toast.message}</p>
           </div>
-          <button onClick={() => setToast(prev => ({ ...prev, show: false }))} style={{ background: "none", border: "none", cursor: "pointer", marginLeft: "10px", color: "#94a3b8" }}>
+          <button onClick={() => setToast(prev => ({ ...prev, show: false }))} style={{ background: "none", border: "none", cursor: "pointer", marginLeft: "10px", color: "var(--iq-faint)" }}>
             <X size={16} />
           </button>
         </div>

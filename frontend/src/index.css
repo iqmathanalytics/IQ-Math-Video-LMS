@@ -53,8 +53,8 @@ html { scroll-behavior: smooth; }
   --iq-inset: #e7eef6;
   --iq-text: #122033;
   --iq-subtle: #243448;
-  --iq-muted: #52657a;
-  --iq-faint: #6d7f93;
+  --iq-muted: #3e5166;
+  --iq-faint: #4d6076;
   --iq-border: rgba(18, 32, 51, 0.12);
   --iq-border-strong: rgba(18, 32, 51, 0.28);
   --iq-accent: #1d7a34;
@@ -75,8 +75,8 @@ html { scroll-behavior: smooth; }
   --iq-inset: #070b12;
   --iq-text: #e8eef7;
   --iq-subtle: #cbd5e1;
-  --iq-muted: #94a3b8;
-  --iq-faint: #64748b;
+  --iq-muted: #c5d0de;
+  --iq-faint: #9aabbd;
   --iq-border: rgba(255, 255, 255, 0.1);
   --iq-border-strong: rgba(255, 255, 255, 0.3);
   --iq-accent: #7cff6b;
@@ -95,72 +95,77 @@ html { scroll-behavior: smooth; }
 .iq-page ::-webkit-scrollbar-thumb { background: var(--iq-faint); }
 
 /* Older admin screens use a slate palette. Map those classes onto the site theme. */
-.iq-admin-body .text-slate-900,
-.iq-admin-body .text-slate-800,
-.iq-admin-body .text-slate-700,
-.iq-admin-body .text-\[\#1e293b\],
-.iq-admin-body .text-\[\#0f172a\] { color: var(--iq-text); }
-.iq-admin-body .text-slate-600,
-.iq-admin-body .text-slate-500,
-.iq-admin-body .text-slate-400 { color: var(--iq-muted); }
-.iq-admin-body .bg-white,
-.iq-admin-body .bg-slate-50 { background-color: var(--iq-surface); }
-.iq-admin-body .bg-slate-100,
-.iq-admin-body .bg-slate-200 { background-color: var(--iq-inset); }
-.iq-admin-body .border-slate-100,
-.iq-admin-body .border-slate-200,
-.iq-admin-body .border-slate-300 { border-color: var(--iq-border); }
-.iq-admin-body .bg-\[\#F8FAFC\],
-.iq-admin-body .bg-\[\#f8fafc\] { background-color: var(--iq-surface); color: var(--iq-text); }
-.iq-admin-body .bg-\[\#005EB8\],
-.iq-admin-body .bg-\[\#005eb8\] { background-color: var(--iq-accent); color: var(--iq-accent-ink); }
-.iq-admin-body .text-\[\#005EB8\],
-.iq-admin-body .text-\[\#005eb8\] { color: var(--iq-link); }
-.iq-admin-body .text-\[\#1e293b\],
-.iq-admin-body .text-\[\#0f172a\] { color: var(--iq-text); }
-.iq-admin-body .text-\[\#64748b\],
-.iq-admin-body .text-\[\#94a3b8\] { color: var(--iq-muted); }
-.iq-admin-body .border-\[\#005EB8\],
-.iq-admin-body .border-\[\#005eb8\] { border-color: var(--iq-accent); }
-.iq-admin-body .border-\[\#cbd5e1\],
-.iq-admin-body .border-\[\#CBD5E1\] { border-color: var(--iq-border); }
-.iq-admin-body .hover\:bg-slate-50:hover,
-.iq-admin-body .hover\:bg-slate-100:hover,
-.iq-admin-body .hover\:bg-slate-200:hover { background-color: var(--iq-hover); }
-.iq-admin-body [class*="bg-[#F8FAFC]"],
-.iq-admin-body [class*="bg-[#f8fafc]"],
-.iq-admin-body [class*="bg-[#E2E8F0]"],
-.iq-admin-body [class*="bg-[#e2e8f0]"],
-.iq-admin-body [class*="bg-blue-50"],
-.iq-admin-body [class*="bg-blue-100"] { background-color: var(--iq-inset); }
-.iq-admin-body [class*="bg-white"] { background-color: var(--iq-surface); }
+.iq-admin-body { color: var(--iq-text); }
+.iq-admin-body [class*="text-[#1e293b]"],
+.iq-admin-body [class*="text-[#0f172a]"],
+.iq-admin-body [class*="text-[#334155]"],
+.iq-admin-body [class*="text-slate-900"],
+.iq-admin-body [class*="text-slate-800"],
+.iq-admin-body [class*="text-slate-700"] { color: var(--iq-text) !important; }
 .iq-admin-body [class*="text-[#475569]"],
 .iq-admin-body [class*="text-[#64748b]"],
 .iq-admin-body [class*="text-[#94a3b8]"],
-.iq-admin-body [class*="text-[#cbd5e1]"] { color: var(--iq-muted); }
+.iq-admin-body [class*="text-[#cbd5e1]"],
+.iq-admin-body [class*="text-slate-600"],
+.iq-admin-body [class*="text-slate-500"],
+.iq-admin-body [class*="text-slate-400"] { color: var(--iq-muted) !important; }
+.iq-admin-body [class*="text-[#005EB8]"],
+.iq-admin-body [class*="text-[#005eb8]"] { color: var(--iq-link) !important; }
+.iq-admin-body [class*="bg-white"],
+.iq-admin-body [class*="bg-slate-50"],
+.iq-admin-body [class*="bg-[#F8FAFC]"],
+.iq-admin-body [class*="bg-[#f8fafc]"] {
+  background-color: var(--iq-surface) !important;
+  color: var(--iq-text);
+}
+.iq-admin-body [class*="bg-slate-100"],
+.iq-admin-body [class*="bg-slate-200"],
+.iq-admin-body [class*="bg-[#E2E8F0]"],
+.iq-admin-body [class*="bg-[#e2e8f0]"],
+.iq-admin-body [class*="bg-blue-50"],
+.iq-admin-body [class*="bg-blue-100"] { background-color: var(--iq-inset) !important; }
+.iq-admin-body [class*="border-slate-100"],
+.iq-admin-body [class*="border-slate-200"],
+.iq-admin-body [class*="border-slate-300"],
+.iq-admin-body [class*="border-[#cbd5e1]"],
+.iq-admin-body [class*="border-[#CBD5E1]"],
 .iq-admin-body [class*="border-[#e2e8f0]"],
 .iq-admin-body [class*="border-[#E2E8F0]"],
 .iq-admin-body [class*="border-blue-100"],
-.iq-admin-body [class*="border-blue-200"] { border-color: var(--iq-border); }
-.iq-admin-body [class*="bg-[#1e293b]"],
-.iq-admin-body [class*="bg-[#0f172a]"] { background-color: var(--iq-ink); color: var(--iq-ink-text); }
+.iq-admin-body [class*="border-blue-200"] { border-color: var(--iq-border) !important; }
+.iq-admin-body [class*="bg-[#005EB8]"]:not([class*="text-[#005EB8]"]),
+.iq-admin-body [class*="bg-[#005eb8]"]:not([class*="text-[#005eb8]"]) {
+  background-color: var(--iq-accent) !important;
+  color: var(--iq-accent-ink) !important;
+}
+.iq-admin-body [class*="bg-[#1e293b]"]:not([class*="/"]),
+.iq-admin-body [class*="bg-[#0f172a]"]:not([class*="/"]) {
+  background-color: var(--iq-ink) !important;
+  color: var(--iq-ink-text) !important;
+}
+.iq-admin-body [class*="bg-[#0f172a]/"] {
+  background-color: rgba(2, 6, 12, 0.72) !important;
+}
 .iq-admin-body [class*="hover:bg-[#005EB8]"]:hover,
 .iq-admin-body [class*="hover:bg-[#005eb8]"]:hover,
 .iq-admin-body [class*="hover:bg-[#004a94]"]:hover {
-  background-color: var(--iq-accent);
-  color: var(--iq-accent-ink);
+  background-color: var(--iq-accent) !important;
+  color: var(--iq-accent-ink) !important;
 }
+.iq-admin-body .hover\:bg-slate-50:hover,
+.iq-admin-body .hover\:bg-slate-100:hover,
+.iq-admin-body .hover\:bg-slate-200:hover { background-color: var(--iq-hover) !important; }
 .iq-admin-body [class*="shadow-blue"] { box-shadow: none; }
 .iq-admin-body .fixed.inset-0 { z-index: 90; }
 .iq-admin-body input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]),
 .iq-admin-body textarea,
 .iq-admin-body select {
-  background-color: var(--iq-surface);
-  color: var(--iq-text);
+  background-color: var(--iq-surface) !important;
+  color: var(--iq-text) !important;
   border-color: var(--iq-border);
 }
 .iq-admin-body input::placeholder,
-.iq-admin-body textarea::placeholder { color: var(--iq-faint); }
+.iq-admin-body textarea::placeholder { color: var(--iq-faint) !important; }
 .iq-surface { background: var(--iq-surface); }
 .iq-inset { background: var(--iq-inset); }
 .iq-header { background: var(--iq-header); }
