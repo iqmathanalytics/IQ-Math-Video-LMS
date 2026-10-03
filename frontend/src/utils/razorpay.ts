@@ -1,4 +1,4 @@
-const PRODUCTION_RAZORPAY_KEY_ID = "rzp_test_TiLwM8zI9XqrMI";
+const PRODUCTION_RAZORPAY_KEY_ID = "rzp_live_T5NFfs64Z8SK0x";
 const PRODUCTION_PAYLINK = "https://razorpay.me/@iqmathtechnologies";
 
 const usable = (value: unknown, fallback: string) => {
