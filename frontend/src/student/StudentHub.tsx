@@ -5,7 +5,7 @@ import API_BASE_URL from "../config";
 import { getValidSession } from "../utils/session";
 import CourseFacts from "../components/CourseFacts";
 import CourseCover from "../components/CourseCover";
-import { razorpayKeyId, withPaymentMethods } from "../utils/razorpay";
+import { checkoutKey, ensureRazorpay, withPaymentMethods } from "../utils/razorpay";
 
 const headers = () => {
   const session = getValidSession();
@@ -145,18 +145,6 @@ export const CourseCatalog = () => {
     return true;
   }), [courses, query, level]);
 
-  const loadRazorpay = () => new Promise<boolean>((resolve) => {
-    if ((window as Window & { Razorpay?: unknown }).Razorpay) {
-      resolve(true);
-      return;
-    }
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-
   const markEnrolled = (course: CatalogCourse) => {
     setEnrolled((current) => new Set(current).add(course.id));
     setMessage(`You are enrolled in ${course.title}. Open it from My learning.`);
@@ -171,13 +159,13 @@ export const CourseCatalog = () => {
         markEnrolled(course);
         return;
       }
-      const loaded = await loadRazorpay();
-      const razorpayKey = razorpayKeyId();
-      if (!loaded || !razorpayKey) {
-        setMessage("Razorpay checkout is not available. Set VITE_RAZORPAY_KEY_ID and refresh.");
+      const order = await axios.post(`${API_BASE_URL}/create-order`, { course_id: course.id }, { headers: headers() });
+      const razorpayKey = checkoutKey(order.data?.key_id);
+      if (!razorpayKey || !order.data?.id) {
+        setMessage("Razorpay checkout is not available right now.");
         return;
       }
-      const order = await axios.post(`${API_BASE_URL}/create-order`, { course_id: course.id }, { headers: headers() });
+      await ensureRazorpay();
       const RazorpayCheckout = (window as unknown as { Razorpay: new (options: object) => { open: () => void } }).Razorpay;
       const checkout = new RazorpayCheckout(withPaymentMethods({
         key: razorpayKey,

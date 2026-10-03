@@ -19,7 +19,7 @@ import * as blazeface from "@tensorflow-models/blazeface";
 import "@tensorflow/tfjs-backend-webgl";
 import BrandLogo from "./components/BrandLogo";
 import { CODE_TEMPLATES } from './utils/codeTemplates';
-import { razorpayKeyId, razorpayPaylink } from './utils/razorpay';
+import { checkoutKey, ensureRazorpay, razorpayPaylink } from './utils/razorpay';
 import { clearSession, getValidSession } from "./utils/session";
 
 // --- TYPES ---
@@ -39,17 +39,6 @@ interface Course {
 }
 
 interface CodeTest { id: number; title: string; time_limit: number; problems: any[]; completed?: boolean; }
-
-// --- RAZORPAY SCRIPT LOADER ---
-const loadRazorpayScript = () => {
-    return new Promise((resolve) => {
-        const script = document.createElement("script");
-        script.src = "https://checkout.razorpay.com/v1/checkout.js";
-        script.onload = () => resolve(true);
-        script.onerror = () => resolve(false);
-        document.body.appendChild(script);
-    });
-};
 
 // --- 🟢 HELPER COMPONENTS ---
 
@@ -720,19 +709,17 @@ const StudentDashboard = () => {
                 triggerToast(`🎉 Free Trial Started for ${selectedCourse.title}!`, "success");
                 fetchData(); setShowModal(false); setActiveTab("learning");
             } else {
-                const isLoaded = await loadRazorpayScript();
-                if (!isLoaded) { triggerToast("SDK Failed to load", "error"); return; }
-                const razorpayKey = razorpayKeyId();
-                if (!razorpayKey) {
-                    triggerToast("Razorpay checkout is not available right now.", "error");
-                    return;
-                }
-
                 const token = localStorage.getItem("token");
                 const orderRes = await axios.post(`${API_BASE_URL}/create-order`,
                     { course_id: selectedCourse.id },
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
+                const razorpayKey = checkoutKey(orderRes.data?.key_id);
+                if (!razorpayKey || !orderRes.data?.id) {
+                    triggerToast("Razorpay checkout is not available right now.", "error");
+                    return;
+                }
+                await ensureRazorpay();
 
                 const options = {
                     key: razorpayKey,

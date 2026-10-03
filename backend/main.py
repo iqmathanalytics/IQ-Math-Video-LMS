@@ -252,9 +252,18 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 60))
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/login") 
 
 # --- 💳 RAZORPAY ---
-RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
-RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
-client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
+def _razorpay_env(name: str) -> str:
+    value = (os.getenv(name) or "").strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+        value = value[1:-1].strip()
+    lowered = value.lower()
+    if not value or lowered in {"replace_me", "change_me"} or lowered.startswith("your_"):
+        return ""
+    return value
+
+RAZORPAY_KEY_ID = _razorpay_env("RAZORPAY_KEY_ID")
+RAZORPAY_KEY_SECRET = _razorpay_env("RAZORPAY_KEY_SECRET")
+client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET)) if RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET else None
 
 def razorpay_failure(exc: Exception) -> HTTPException:
     message = str(exc)
@@ -2260,8 +2269,8 @@ async def create_payment_order(
     current_user: models.User = Depends(get_current_user)
 ):
     # Razorpay client is sync, use thread
-    if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET or "replace_me" in str(RAZORPAY_KEY_ID) or "replace_me" in str(RAZORPAY_KEY_SECRET):
-        raise HTTPException(status_code=500, detail="Razorpay is not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in backend/.env")
+    if not client or not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
+        raise HTTPException(status_code=500, detail="Razorpay is not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET on the API service.")
 
     res = await db.execute(select(models.Course).where(models.Course.id == data.course_id))
     course = res.scalars().first()
@@ -2285,7 +2294,14 @@ async def create_payment_order(
     for attempt in range(2):
         try:
             order = await asyncio.to_thread(client.order.create, data=order_data)
-            return order
+            # Return the public key that created this order so checkout never mismatches the API account.
+            return {
+                "id": order.get("id"),
+                "amount": order.get("amount"),
+                "currency": order.get("currency") or "INR",
+                "status": order.get("status"),
+                "key_id": RAZORPAY_KEY_ID,
+            }
         except Exception as e:
             last_error = e
             if "authentication" in str(e).lower() or attempt == 1:
@@ -2299,8 +2315,8 @@ async def verify_payment_and_unlock_course(
     db: AsyncSession = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET or "replace_me" in str(RAZORPAY_KEY_ID) or "replace_me" in str(RAZORPAY_KEY_SECRET):
-        raise HTTPException(status_code=500, detail="Razorpay is not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in backend/.env")
+    if not client or not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
+        raise HTTPException(status_code=500, detail="Razorpay is not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET on the API service.")
 
     res = await db.execute(select(models.Course).where(models.Course.id == payload.course_id))
     course = res.scalars().first()

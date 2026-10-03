@@ -11,7 +11,7 @@ import {
     Zap, CheckSquare, Square, CheckCheck, Award, Edit, AlertTriangle, LockKeyhole, Cloud, Link as ResourceLinkIcon // <--- Added 'Cloud' icon here
 } from "lucide-react";
 import { CODE_TEMPLATES } from './utils/codeTemplates';
-import { ensureRazorpay, razorpayKeyId, razorpayPaylink, withPaymentMethods } from './utils/razorpay';
+import { checkoutKey, ensureRazorpay, razorpayPaylink, withPaymentMethods } from './utils/razorpay';
 import { youtubeIdFromLink } from './utils/youtube';
 
 
@@ -1009,11 +1009,6 @@ const CoursePlayer = () => {
 
             const orderUrl = `${API_BASE_URL}/create-order`;
             const token = localStorage.getItem("token");
-            const razorpayKey = razorpayKeyId();
-            if (!razorpayKey) {
-                triggerToast("Razorpay checkout is not available right now.", "error");
-                return;
-            }
 
             // ✅ 2. Create order for this exact course (amount comes from backend)
             const { data } = await axios.post(
@@ -1021,6 +1016,11 @@ const CoursePlayer = () => {
                 { course_id: Number(courseId) },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
+            const razorpayKey = checkoutKey(data?.key_id);
+            if (!razorpayKey || !data?.id) {
+                triggerToast("Razorpay checkout is not available right now.", "error");
+                return;
+            }
 
             const options = withPaymentMethods({
                 key: razorpayKey,

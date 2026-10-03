@@ -25,25 +25,14 @@ export const ensureRazorpay = () => new Promise<void>((resolve, reject) => {
   document.head.appendChild(script);
 });
 
-/** UPI, cards, netbanking, and wallets for a paid course. */
+/** Prefer the key that created the order so checkout matches the API Razorpay account. */
+export const checkoutKey = (orderKey?: string | null) => {
+  const fromOrder = String(orderKey || "").trim();
+  if (fromOrder.startsWith("rzp_")) return fromOrder;
+  return razorpayKeyId();
+};
+
+/** Keep checkout simple. Custom method blocks often break Standard Checkout. */
 export const withPaymentMethods = <T extends object>(options: T) => ({
   ...options,
-  method: {
-    upi: true,
-    card: true,
-    netbanking: true,
-    wallet: true,
-  },
-  config: {
-    display: {
-      blocks: {
-        upi: { name: "UPI", instruments: [{ method: "upi" }] },
-        card: { name: "Cards", instruments: [{ method: "card" }] },
-        netbanking: { name: "Netbanking", instruments: [{ method: "netbanking" }] },
-        wallet: { name: "Wallets", instruments: [{ method: "wallet" }] },
-      },
-      sequence: ["block.upi", "block.card", "block.netbanking", "block.wallet"],
-      preferences: { show_default_blocks: true },
-    },
-  },
 });
