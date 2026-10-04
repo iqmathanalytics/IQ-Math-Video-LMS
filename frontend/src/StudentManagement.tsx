@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import API_BASE_URL from './config';
-import { Trash2, User, Search, AlertCircle, X, Calendar, CheckCircle, AlertTriangle, RefreshCw, Key, ChevronDown, ChevronUp } from "lucide-react";
+import { Trash2, User, AlertCircle, X, Calendar, CheckCircle, AlertTriangle, RefreshCw, Key, ChevronDown, ChevronUp } from "lucide-react";
 
 interface Student {
   id: number;
@@ -24,13 +24,11 @@ const StudentManagement = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
   const [filterCollege, setFilterCollege] = useState("");
   const [filterOrganization, setFilterOrganization] = useState("");
-  const [assignEmails, setAssignEmails] = useState("");
   const [assignCollege, setAssignCollege] = useState("");
   const [assignOrganization, setAssignOrganization] = useState("");
-  const [assignCourseIds, setAssignCourseIds] = useState<number[]>([]);
+  const [assignCourseId, setAssignCourseId] = useState("");
   const [assignBusy, setAssignBusy] = useState(false);
   const [expandedCourses, setExpandedCourses] = useState<Set<number>>(new Set());
 
@@ -128,12 +126,6 @@ const StudentManagement = () => {
     }
   };
 
-  const toggleAssignCourse = (courseId: number) => {
-    setAssignCourseIds((current) =>
-      current.includes(courseId) ? current.filter((id) => id !== courseId) : [...current, courseId]
-    );
-  };
-
   const toggleCourseList = (studentId: number) => {
     setExpandedCourses((current) => {
       const next = new Set(current);
@@ -144,31 +136,26 @@ const StudentManagement = () => {
   };
 
   const handleAssign = async () => {
-    const emails = assignEmails
-      .split(/[\n,;]+/)
-      .map((item) => item.trim())
-      .filter(Boolean);
-    if (assignCourseIds.length === 0) {
-      triggerToast("Select at least one course.", "error");
+    const courseId = Number(assignCourseId);
+    if (!courseId) {
+      triggerToast("Select a course to assign.", "error");
       return;
     }
-    if (!emails.length && !assignCollege.trim() && !assignOrganization.trim()) {
-      triggerToast("Enter email(s), college, or organization.", "error");
+    if (!assignCollege.trim() && !assignOrganization.trim()) {
+      triggerToast("Select a college or organization.", "error");
       return;
     }
     setAssignBusy(true);
     try {
       const res = await axios.post(`${API_BASE_URL}/admin/assign-courses`, {
-        course_ids: assignCourseIds,
-        emails: emails.length ? emails : undefined,
+        course_ids: [courseId],
         college: assignCollege.trim() || undefined,
         organization: assignOrganization.trim() || undefined,
       }, { headers: authHeaders() });
       triggerToast(res.data?.message || "Courses assigned.", "success");
-      setAssignEmails("");
       setAssignCollege("");
       setAssignOrganization("");
-      setAssignCourseIds([]);
+      setAssignCourseId("");
       await fetchStudents();
     } catch (err: unknown) {
       const detail = axios.isAxiosError(err) ? err.response?.data?.detail : "";
@@ -179,9 +166,6 @@ const StudentManagement = () => {
   };
 
   const filteredStudents = students.filter((s) => {
-    const term = searchTerm.trim().toLowerCase();
-    const text = `${s.full_name} ${s.email} ${s.phone_number || ""} ${s.college || ""} ${s.organization || ""}`.toLowerCase();
-    if (term && !text.includes(term)) return false;
     if (filterCollege && (s.college || "").trim() !== filterCollege) return false;
     if (filterOrganization && (s.organization || "").trim() !== filterOrganization) return false;
     return true;
@@ -189,96 +173,50 @@ const StudentManagement = () => {
 
   return (
     <div style={{ padding: "40px", maxWidth: "1200px", margin: "0 auto", position: "relative" }}>
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        <div>
-          <h1 style={{ fontSize: "28px", fontWeight: "800", color: brand.textMain, margin: 0 }}>Student Management</h1>
-          <p style={{ color: brand.textLight, marginTop: "5px" }}>View profiles and assign courses by email, college, or organization.</p>
-        </div>
-        <div style={{ position: "relative", width: "100%", maxWidth: "300px" }}>
-          <Search size={18} style={{ position: "absolute", left: "12px", top: "12px", color: brand.textLight }} />
-          <input
-            type="text"
-            placeholder="Search name, email, college…"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{
-              width: "100%", padding: "10px 10px 10px 40px", borderRadius: "10px",
-              border: `1px solid ${brand.border}`, outline: "none", fontSize: "14px", background: brand.cardBg, color: brand.textMain
-            }}
-          />
-        </div>
+      <div className="mb-8">
+        <h1 style={{ fontSize: "28px", fontWeight: "800", color: brand.textMain, margin: 0 }}>Student Management</h1>
+        <p style={{ color: brand.textLight, marginTop: "5px" }}>View profiles and assign courses by college or organization.</p>
       </div>
 
       <div style={{ background: brand.cardBg, borderRadius: "16px", border: `1px solid ${brand.border}`, padding: "24px", marginBottom: "24px" }}>
         <h2 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: brand.textMain }}>Assign courses</h2>
         <p style={{ marginTop: "6px", color: brand.textLight, fontSize: "14px" }}>
-          Match students by email list and/or exact college / organization from their profile, then enroll them.
+          Choose a college and/or organization, pick one course, then assign it to every matching student.
         </p>
         <div className="grid gap-4 md:grid-cols-3 mt-4">
           <label style={{ display: "block", fontSize: "13px", color: brand.textLight }}>
-            Emails (one per line or comma-separated)
-            <textarea
-              value={assignEmails}
-              onChange={(e) => setAssignEmails(e.target.value)}
-              rows={4}
-              placeholder="student@college.edu"
-              style={{ width: "100%", marginTop: "6px", padding: "10px", borderRadius: "10px", border: `1px solid ${brand.border}`, background: "var(--iq-inset)", color: brand.textMain }}
-            />
-          </label>
-          <label style={{ display: "block", fontSize: "13px", color: brand.textLight }}>
             College
-            <input
-              list="college-options"
+            <select
               value={assignCollege}
               onChange={(e) => setAssignCollege(e.target.value)}
-              placeholder="Exact college name"
               style={{ width: "100%", marginTop: "6px", padding: "10px", borderRadius: "10px", border: `1px solid ${brand.border}`, background: "var(--iq-inset)", color: brand.textMain }}
-            />
-            <datalist id="college-options">
-              {collegeOptions.map((item) => <option key={item} value={item} />)}
-            </datalist>
+            >
+              <option value="">Select college</option>
+              {collegeOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
           </label>
           <label style={{ display: "block", fontSize: "13px", color: brand.textLight }}>
             Organization
-            <input
-              list="organization-options"
+            <select
               value={assignOrganization}
               onChange={(e) => setAssignOrganization(e.target.value)}
-              placeholder="Exact organization name"
               style={{ width: "100%", marginTop: "6px", padding: "10px", borderRadius: "10px", border: `1px solid ${brand.border}`, background: "var(--iq-inset)", color: brand.textMain }}
-            />
-            <datalist id="organization-options">
-              {organizationOptions.map((item) => <option key={item} value={item} />)}
-            </datalist>
+            >
+              <option value="">Select organization</option>
+              {organizationOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
           </label>
-        </div>
-        <div className="mt-4">
-          <p style={{ fontSize: "13px", color: brand.textLight, marginBottom: "8px" }}>Courses</p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-            {courses.length === 0 && <span style={{ fontSize: "13px", color: brand.textLight }}>No courses loaded.</span>}
-            {courses.map((course) => {
-              const active = assignCourseIds.includes(course.id);
-              return (
-                <button
-                  key={course.id}
-                  type="button"
-                  onClick={() => toggleAssignCourse(course.id)}
-                  style={{
-                    padding: "8px 12px",
-                    borderRadius: "999px",
-                    border: `1px solid ${active ? brand.blue : brand.border}`,
-                    background: active ? "var(--iq-inset)" : "transparent",
-                    color: brand.textMain,
-                    fontSize: "13px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  {course.title}
-                </button>
-              );
-            })}
-          </div>
+          <label style={{ display: "block", fontSize: "13px", color: brand.textLight }}>
+            Course
+            <select
+              value={assignCourseId}
+              onChange={(e) => setAssignCourseId(e.target.value)}
+              style={{ width: "100%", marginTop: "6px", padding: "10px", borderRadius: "10px", border: `1px solid ${brand.border}`, background: "var(--iq-inset)", color: brand.textMain }}
+            >
+              <option value="">Select course</option>
+              {courses.map((course) => <option key={course.id} value={course.id}>{course.title}</option>)}
+            </select>
+          </label>
         </div>
         <button
           type="button"
