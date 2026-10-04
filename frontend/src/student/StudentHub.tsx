@@ -15,7 +15,6 @@ const headers = () => {
 type Mine = { id: number; title: string; description: string; has_certificate?: boolean; price?: number; image_url?: string | null; lessons_total?: number; lessons_done?: number };
 type CatalogCourse = { id: number; title: string; description: string; price: number; image_url?: string | null; is_published?: boolean; language?: string | null; course_type?: string };
 type Profile = { id: number; full_name: string; email: string; phone_number?: string | null };
-type Notice = { id: number; title: string; message: string; is_read: boolean };
 
 const downloadCertificate = async (courseId: number, title: string) => {
   const claim = await axios.post(`${API_BASE_URL}/courses/${courseId}/claim-certificate`, {}, { headers: headers() });
@@ -31,7 +30,6 @@ export const StudentHome = () => {
   const [name, setName] = useState("Student");
   const [courses, setCourses] = useState<Mine[]>([]);
   const [published, setPublished] = useState<CatalogCourse[]>([]);
-  const [notices, setNotices] = useState<Notice[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
 
   useEffect(() => {
@@ -45,7 +43,6 @@ export const StudentHome = () => {
         setName(account.data?.user?.full_name || "Student");
         setCourses(Array.isArray(account.data?.courses) ? account.data.courses : []);
         setPublished(Array.isArray(catalog.data) ? catalog.data : []);
-        setNotices(Array.isArray(account.data?.notices) ? account.data.notices : []);
         setStatus("ready");
       })
       .catch(() => { if (!cancelled) setStatus("error"); });
@@ -99,15 +96,6 @@ export const StudentHome = () => {
                     ? <Link to={`/my-courses/${course.id}`} className="mt-3 inline-block text-sm iq-link">Continue</Link>
                     : <Link to="/courses" className="mt-3 inline-block text-sm iq-link">Enroll</Link>}
                 </li>
-              ))}
-            </ul>
-          </section>
-          <section className="mt-4 rounded-2xl border iq-line p-5">
-            <h2 className="text-lg font-semibold">Notices</h2>
-            {notices.length === 0 && <p className="mt-2 text-sm iq-muted">No messages yet.</p>}
-            <ul className="mt-3 space-y-2 text-sm">
-              {notices.slice(0, 5).map((notice) => (
-                <li key={notice.id}><span className="font-semibold">{notice.title}</span> <span className="iq-muted">{notice.message}</span></li>
               ))}
             </ul>
           </section>
