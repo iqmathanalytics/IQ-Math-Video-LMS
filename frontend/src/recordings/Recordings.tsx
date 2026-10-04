@@ -176,8 +176,15 @@ export const RecordingPlayer = () => {
             ))}
           </ul>
         )}
-        <label className="mt-6 block text-sm">Notes for this recording
-          <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={4} className="mt-1 w-full rounded-xl border iq-line iq-surface px-3 py-3" />
+        <label className="iq-notes-panel mt-6 block rounded-2xl border iq-line p-4 text-sm">
+          <span className="iq-notes-title">Notes for this recording</span>
+          <textarea
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            rows={5}
+            className="iq-notes-field mt-2"
+            placeholder="Write what you want to remember from this recording."
+          />
         </label>
         <p className="mt-1 text-xs iq-muted">Saved on this device.</p>
       </section>

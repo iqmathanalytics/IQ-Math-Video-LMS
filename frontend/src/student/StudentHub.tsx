@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import API_BASE_URL from "../config";
 import { getValidSession } from "../utils/session";
@@ -81,7 +81,7 @@ export const StudentHome = () => {
             {next ? (
               <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
                 <div className="flex min-w-0 flex-1 items-center gap-4">
-                  <div className="w-36 shrink-0"><CourseCover title={next.title} imageUrl={next.image_url} /></div>
+                  <div className="w-36 shrink-0"><CourseCover title={next.title} imageUrl={next.image_url} priority /></div>
                   <div className="min-w-0">
                     <p className="font-semibold">{next.title}</p>
                     <CourseFacts description={next.description} />
@@ -95,14 +95,14 @@ export const StudentHome = () => {
             <h2 className="text-lg font-semibold">Published courses</h2>
             {published.length === 0 && <p className="mt-3 text-sm iq-muted">No published courses yet.</p>}
             <ul className="mt-3 grid gap-4 md:grid-cols-2">
-              {published.map((course) => (
+              {published.map((course, index) => (
                 <li key={course.id} className="rounded-2xl border iq-line p-4">
-                  <CourseCover title={course.title} imageUrl={course.image_url} />
+                  <CourseCover title={course.title} imageUrl={course.image_url} priority={index < 2} />
                   <h3 className="mt-3 font-semibold">{course.title}</h3>
                   <p className="mt-1 text-sm iq-muted">{Number(course.price) > 0 ? `₹${course.price}` : "Free"}</p>
                   {enrolledIds.has(course.id)
                     ? <Link to={`/my-courses/${course.id}`} className="mt-3 inline-block text-sm iq-link">Continue</Link>
-                    : <Link to="/courses" className="mt-3 inline-block text-sm iq-link">Enroll</Link>}
+                    : <Link to={`/courses?course=${course.id}`} className="mt-3 inline-block text-sm iq-link">Enroll</Link>}
                 </li>
               ))}
             </ul>
@@ -114,6 +114,9 @@ export const StudentHome = () => {
 };
 
 export const CourseCatalog = () => {
+  const [searchParams] = useSearchParams();
+  const focusId = Number(searchParams.get("course") || 0) || 0;
+  const focusRef = useRef<HTMLLIElement | null>(null);
   const [courses, setCourses] = useState<CatalogCourse[]>([]);
   const [enrolled, setEnrolled] = useState<Set<number>>(new Set());
   const [query, setQuery] = useState("");
@@ -133,13 +136,22 @@ export const CourseCatalog = () => {
     }).catch(() => setStatus("error"));
   }, []);
 
-  const shown = useMemo(() => courses.filter((course) => {
-    const text = `${course.title} ${course.description || ""}`.toLowerCase();
-    if (query.trim() && !text.includes(query.trim().toLowerCase())) return false;
-    if (level === "Free" && Number(course.price) > 0) return false;
-    if (level === "Paid" && Number(course.price) === 0) return false;
-    return true;
-  }), [courses, query, level]);
+  useEffect(() => {
+    if (status !== "ready" || !focusId || !focusRef.current) return;
+    focusRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [status, focusId, courses]);
+
+  const shown = useMemo(() => {
+    const filtered = courses.filter((course) => {
+      const text = `${course.title} ${course.description || ""}`.toLowerCase();
+      if (query.trim() && !text.includes(query.trim().toLowerCase())) return false;
+      if (level === "Free" && Number(course.price) > 0) return false;
+      if (level === "Paid" && Number(course.price) === 0) return false;
+      return true;
+    });
+    if (!focusId) return filtered;
+    return [...filtered].sort((a, b) => Number(b.id === focusId) - Number(a.id === focusId));
+  }, [courses, query, level, focusId]);
 
   const markEnrolled = (course: CatalogCourse) => {
     setEnrolled((current) => new Set(current).add(course.id));
@@ -206,19 +218,31 @@ export const CourseCatalog = () => {
       {status === "loading" && <p className="mt-6 text-sm iq-muted">Loading the catalogue…</p>}
       {status === "error" && <p className="mt-6 text-sm iq-muted">The catalogue could not be loaded.</p>}
       {status === "ready" && shown.length === 0 && <p className="mt-6 rounded-2xl border iq-line p-5 text-sm iq-muted">No published courses match those filters.</p>}
+      {focusId > 0 && status === "ready" && !courses.some((course) => course.id === focusId) && (
+        <p className="mt-4 rounded-2xl border iq-line p-4 text-sm iq-muted">That shared course is not in the published catalogue.</p>
+      )}
       <ul className="mt-6 grid gap-4 md:grid-cols-2">
-        {shown.map((course) => (
-          <li key={course.id} className="rounded-2xl border iq-line p-5">
-            <CourseCover title={course.title} imageUrl={course.image_url} />
-            <p className="mt-3 text-xs uppercase tracking-[0.14em] iq-faint">{Number(course.price) > 0 ? `₹${course.price}` : "Free"} · {course.language || course.course_type || "Course"}</p>
-            {Number(course.price) > 0 && !enrolled.has(course.id) && <p className="mt-1 text-xs iq-muted">Pay with UPI, card, netbanking, or a wallet.</p>}
-            <h2 className="mt-2 text-xl font-semibold">{course.title}</h2>
-            <CourseFacts description={course.description} />
-            <div className="mt-4 flex flex-wrap gap-2">
-              {enrolled.has(course.id) ? <Link to={`/my-courses/${course.id}`} className="rounded-full iq-accent-bg px-4 py-2 text-sm font-semibold">Continue</Link> : <button type="button" disabled={busyId === course.id} onClick={() => enroll(course)} className="rounded-full iq-accent-bg px-4 py-2 text-sm font-semibold disabled:opacity-50">{busyId === course.id ? "Opening checkout…" : Number(course.price) > 0 ? `Pay ₹${course.price}` : "Enroll free"}</button>}
-            </div>
-          </li>
-        ))}
+        {shown.map((course) => {
+          const focused = course.id === focusId;
+          return (
+            <li
+              key={course.id}
+              ref={focused ? focusRef : undefined}
+              id={focused ? `course-${course.id}` : undefined}
+              className={`rounded-2xl border p-5 ${focused ? "iq-line ring-2 ring-[var(--iq-accent,#1d7a34)] iq-surface" : "iq-line"}`}
+            >
+              {focused && <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] iq-accent">Shared course</p>}
+              <CourseCover title={course.title} imageUrl={course.image_url} />
+              <p className="mt-3 text-xs uppercase tracking-[0.14em] iq-faint">{Number(course.price) > 0 ? `₹${course.price}` : "Free"} · {course.language || course.course_type || "Course"}</p>
+              {Number(course.price) > 0 && !enrolled.has(course.id) && <p className="mt-1 text-xs iq-muted">Pay with UPI, card, netbanking, or a wallet.</p>}
+              <h2 className="mt-2 text-xl font-semibold">{course.title}</h2>
+              <CourseFacts description={course.description} />
+              <div className="mt-4 flex flex-wrap gap-2">
+                {enrolled.has(course.id) ? <Link to={`/my-courses/${course.id}`} className="rounded-full iq-accent-bg px-4 py-2 text-sm font-semibold">Continue</Link> : <button type="button" disabled={busyId === course.id} onClick={() => enroll(course)} className="rounded-full iq-accent-bg px-4 py-2 text-sm font-semibold disabled:opacity-50">{busyId === course.id ? "Opening checkout…" : Number(course.price) > 0 ? `Pay ₹${course.price}` : "Enroll free"}</button>}
+              </div>
+            </li>
+          );
+        })}
       </ul>
       {message && <p className="mt-4 text-sm iq-muted">{message}</p>}
     </div>

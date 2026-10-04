@@ -35,6 +35,11 @@ class Course(Base):
     instructor_id = Column(Integer, ForeignKey("users.id"))
     course_type = Column(String(32), default="standard") # 'standard' or 'coding'
     language = Column(String(64), nullable=True) # e.g., 'python', 'javascript' (for compiler)
+    # Per-course certificate ID: {cert_prefix}-{cert_code}-{seq padded to cert_number_width}
+    cert_prefix = Column(String(8), default="IQ")
+    cert_code = Column(String(3), nullable=True)
+    cert_number_width = Column(Integer, default=3)
+    cert_seq = Column(Integer, default=0)
     modules = relationship("Module", back_populates="course")
     enrollments = relationship("Enrollment", back_populates="course")
     challenges = relationship("CourseChallenge", back_populates="course")

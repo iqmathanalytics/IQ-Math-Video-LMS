@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import BrandLogo from "../components/BrandLogo";
+import BackButton from "../components/BackButton";
 import ThemeToggle from "../components/ThemeToggle";
 import API_BASE_URL from "../config";
 import { useDayTheme } from "../public/useDayTheme";
@@ -200,7 +201,10 @@ const LearnerAuth = () => {
           <div className="w-full max-w-md">
             <div className="flex items-center justify-between gap-3">
               <Link to="/" aria-label="IQNex home"><BrandLogo tone={theme === "dark" ? "onDark" : "ink"} size="sm" /></Link>
-              <ThemeToggle />
+              <div className="flex items-center gap-2">
+                <BackButton fallback="/" always />
+                <ThemeToggle />
+              </div>
             </div>
             {offline && <p className="mt-4 rounded-xl border iq-line px-3 py-2 text-sm">You appear to be offline. Sign-in needs a connection.</p>}
             {error && <p className="mt-4 rounded-xl border border-[#b42318] px-3 py-2 text-sm" role="alert">{error}</p>}

@@ -10,6 +10,8 @@ import { clearSession, getValidSession } from "../utils/session";
 import { embedSrcFromLink, youtubeIdFromLink } from "../utils/youtube";
 import CourseFacts from "../components/CourseFacts";
 import CourseCover from "../components/CourseCover";
+import BackButton from "../components/BackButton";
+import LessonMedia from "../components/LessonMedia";
 
 type Notice = { id: number; title: string; message: string; is_read?: boolean };
 
@@ -152,7 +154,10 @@ const Shell = () => {
         </div>
       </header>
       {offline && <p className="mx-auto max-w-6xl px-4 pt-4 text-sm">You are offline. Notes already on this device stay here. Course lists need a connection.</p>}
-      <main className="mx-auto max-w-6xl px-4 py-8 pb-24 lg:pb-8"><Outlet /></main>
+      <main className="mx-auto max-w-6xl px-4 py-8 pb-24 lg:pb-8">
+        <div className="mb-4"><BackButton fallback="/home" /></div>
+        <Outlet />
+      </main>
       <nav className="fixed inset-x-0 bottom-0 z-40 flex justify-around border-t iq-line iq-header px-2 py-2 text-xs lg:hidden" aria-label="Student">
         <NavLink to="/home" className={({ isActive }) => `px-2 py-2 ${isActive ? "iq-accent" : "iq-muted"}`}>Home</NavLink>
         <NavLink to="/courses" className={({ isActive }) => `px-2 py-2 ${isActive ? "iq-accent" : "iq-muted"}`}>Courses</NavLink>
@@ -403,16 +408,25 @@ const LearnPage = () => {
   const previous = index > 0 ? siblings[index - 1] : null;
   const next = index >= 0 && index < siblings.length - 1 ? siblings[index + 1] : null;
 
-  const markDone = async () => {
-    if (!lesson) return;
+  const markDone = async (opts?: { quiet?: boolean }) => {
+    if (!lesson || lesson.is_completed) return;
+    const lessonId = lesson.id;
+    const stamp = (completed: boolean) => {
+      setLesson((prev) => (prev && prev.id === lessonId ? { ...prev, is_completed: completed } : prev));
+      setSiblings((prev) => prev.map((item) => (item.id === lessonId ? { ...item, is_completed: completed } : item)));
+    };
+    stamp(true);
     if (courseId === "demos") {
-      const nextDone = Array.from(new Set([...demoDone(), lesson.id]));
+      const nextDone = Array.from(new Set([...demoDone(), lessonId]));
       localStorage.setItem(demoDoneKey, JSON.stringify(nextDone));
-      setLesson({ ...lesson, is_completed: true });
       return;
     }
-    await axios.post(`${API_BASE_URL}/content/${lesson.id}/complete`, {}, { headers: authHeaders() });
-    setLesson({ ...lesson, is_completed: true });
+    try {
+      await axios.post(`${API_BASE_URL}/content/${lessonId}/complete`, {}, { headers: authHeaders() });
+    } catch {
+      stamp(false);
+      if (!opts?.quiet) window.alert("Could not mark this lesson complete. Try again.");
+    }
   };
 
   return (
@@ -427,7 +441,10 @@ const LearnPage = () => {
             <ul className="mt-3 space-y-1">
               {siblings.map((item) => (
                 <li key={item.id}>
-                  <Link to={`/learn/${courseId}/${item.id}`} className={`block rounded-lg px-2 py-2 text-sm ${item.id === lesson.id ? "iq-accent" : "iq-subtle"}`}>{item.title}</Link>
+                  <Link to={`/learn/${courseId}/${item.id}`} className={`flex items-center justify-between gap-2 rounded-lg px-2 py-2 text-sm ${item.id === lesson.id ? "iq-accent" : "iq-subtle"}`}>
+                    <span className="truncate">{item.title}</span>
+                    {item.is_completed && <span className="shrink-0 text-xs iq-faint">✓</span>}
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -449,7 +466,12 @@ const LearnPage = () => {
               )}
               {embedSrc ? (
                 <div className="overflow-hidden rounded-2xl border iq-line bg-black">
-                  <iframe key={embedSrc} className="aspect-video w-full" src={embedSrc} title={lesson.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen />
+                  <LessonMedia
+                    key={lesson.id}
+                    url={lesson.url || ""}
+                    title={lesson.title}
+                    onEnded={() => { void markDone({ quiet: true }); }}
+                  />
                 </div>
               ) : (
                 <div className="whitespace-pre-wrap rounded-2xl border iq-line p-6 text-sm">
@@ -462,15 +484,31 @@ const LearnPage = () => {
               <div className="mt-4 flex flex-wrap gap-2 text-sm">
                 {previous && <Link className="rounded-full border iq-line px-3 py-2" to={`/learn/${courseId}/${previous.id}`}>Previous</Link>}
                 {next && <Link className="rounded-full border iq-line px-3 py-2" to={`/learn/${courseId}/${next.id}`}>Next</Link>}
-                <button type="button" className="rounded-full iq-accent-bg px-3 py-2 font-semibold" onClick={markDone}>{lesson.is_completed ? "Completed" : "Mark complete"}</button>
+                <button
+                  type="button"
+                  className={`rounded-full px-3 py-2 font-semibold ${lesson.is_completed ? "border iq-line iq-accent" : "iq-accent-bg"}`}
+                  onClick={() => { void markDone(); }}
+                  disabled={lesson.is_completed}
+                >
+                  {lesson.is_completed ? "Completed ✓" : "Mark complete"}
+                </button>
                 <button type="button" className="rounded-full border iq-line px-3 py-2" onClick={() => setFocus((value) => !value)}>{focus ? "Exit focus" : "Focus"}</button>
               </div>
             </div>
           </section>
-          <aside className={`rounded-2xl border iq-line p-4 ${focus ? "flex min-h-0 flex-col" : ""}`}>
-            <div className="flex items-center justify-between"><h2 className="font-semibold">Notes</h2><span className="text-xs iq-faint">{saved}</span></div>
+          <aside className={`iq-notes-panel rounded-2xl border iq-line p-4 ${focus ? "flex min-h-0 flex-col" : ""}`}>
+            <div className="flex items-center justify-between">
+              <h2 className="iq-notes-title text-base">Notes</h2>
+              <span className="text-xs iq-faint">{saved}</span>
+            </div>
             <p className="mt-1 text-xs iq-muted">Saved on your account, and kept in this browser if you are offline.</p>
-            <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={focus ? undefined : 12} className={`mt-3 w-full rounded-xl border iq-line iq-surface px-3 py-3 text-sm ${focus ? "min-h-48 flex-1 resize-none" : ""}`} placeholder="Write what you want to remember." />
+            <textarea
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              rows={focus ? undefined : 12}
+              className={`iq-notes-field mt-3 ${focus ? "min-h-48 flex-1 resize-none" : "resize-y"}`}
+              placeholder="Write what you want to remember."
+            />
             <Link to={`/course/${courseId}/player?lesson=${lesson.id}`} className="mt-3 inline-block text-sm iq-link">Open assignments, quizzes, and code for this lesson</Link>
             <Link to={`/my-courses/${courseId}/notes`} className="mt-3 inline-block text-sm iq-link">Open notebook</Link>
           </aside>
@@ -515,13 +553,15 @@ const Notebook = () => {
     <div>
       <p className="text-sm iq-muted"><Link to={`/my-courses/${courseId}`} className="iq-link">Back to course</Link></p>
       <h1 className="mt-2 text-3xl font-semibold">Notebook</h1>
+      <p className="mt-2 max-w-2xl text-sm iq-muted">All lesson notes for this course. Text stays readable in light and dark theme.</p>
       <button type="button" onClick={download} className="mt-4 rounded-full border iq-line px-4 py-2 text-sm">Download Markdown</button>
       {rows.length === 0 && <p className="mt-6 text-sm iq-muted">Notes you write beside a lesson will collect here.</p>}
       <ul className="mt-6 space-y-4">
         {rows.map((row) => (
-          <li key={row.lessonId} className="rounded-2xl border iq-line p-4">
-            <Link className="font-semibold iq-link" to={`/learn/${courseId}/${row.lessonId}`}>{row.title}</Link>
-            <p className="mt-2 whitespace-pre-wrap text-sm iq-muted">{row.note}</p>
+          <li key={row.lessonId} className="iq-notes-panel rounded-2xl border iq-line p-4">
+            <Link className="iq-notes-title text-base iq-link" to={`/learn/${courseId}/${row.lessonId}`}>{row.title}</Link>
+            <p className="iq-notes-body mt-3 whitespace-pre-wrap text-sm">{row.note}</p>
+            <Link to={`/learn/${courseId}/${row.lessonId}`} className="mt-3 inline-block text-sm iq-link">Edit in lesson</Link>
           </li>
         ))}
       </ul>

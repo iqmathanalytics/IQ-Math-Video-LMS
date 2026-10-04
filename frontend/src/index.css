@@ -219,6 +219,60 @@ html { scroll-behavior: smooth; }
 .iq-muted { color: var(--iq-muted); }
 .iq-subtle { color: var(--iq-subtle); }
 .iq-faint { color: var(--iq-faint); }
+
+/* Form fields inside themed pages stay readable in light and dark. */
+.iq-page input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]),
+.iq-page textarea,
+.iq-page select {
+  background-color: var(--iq-surface);
+  color: var(--iq-text);
+  border-color: var(--iq-border);
+  caret-color: var(--iq-text);
+}
+.iq-page input::placeholder,
+.iq-page textarea::placeholder {
+  color: var(--iq-faint);
+  opacity: 1;
+}
+.iq-page option {
+  background-color: var(--iq-surface);
+  color: var(--iq-text);
+}
+
+/* Dedicated notes panel used in lessons, notebook, player, and recordings. */
+.iq-notes-panel {
+  background: var(--iq-surface);
+  color: var(--iq-text);
+  border-color: var(--iq-border);
+}
+.iq-notes-title {
+  color: var(--iq-text);
+  font-weight: 600;
+}
+.iq-notes-body {
+  color: var(--iq-text);
+  line-height: 1.55;
+}
+.iq-notes-field {
+  width: 100%;
+  background: var(--iq-surface) !important;
+  color: var(--iq-text) !important;
+  border: 1px solid var(--iq-border) !important;
+  caret-color: var(--iq-text);
+  border-radius: 0.75rem;
+  padding: 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  outline: none;
+}
+.iq-notes-field:focus {
+  border-color: var(--iq-border-strong) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--iq-link) 22%, transparent);
+}
+.iq-notes-field::placeholder {
+  color: var(--iq-faint) !important;
+  opacity: 1;
+}
 .iq-line { border-color: var(--iq-border); }
 .iq-accent { color: var(--iq-accent); }
 .iq-accent-border { border-color: var(--iq-accent); }

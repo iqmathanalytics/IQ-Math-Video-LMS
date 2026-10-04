@@ -297,9 +297,9 @@ const LandingPage = () => {
             </ul>
             {courses.length > 0 && (
               <ul className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {courses.map((course) => (
+                {courses.map((course, index) => (
                   <li key={course.id} className="flex flex-col overflow-hidden rounded-2xl border iq-line iq-surface">
-                    <CourseCover title={course.title} imageUrl={course.image_url} className="rounded-none" />
+                    <CourseCover title={course.title} imageUrl={course.image_url} className="rounded-none" priority={index < 3} />
                     <div className="flex flex-1 flex-col p-5">
                       <p className="text-xs uppercase tracking-[0.14em] iq-faint">{Number(course.price) > 0 ? `₹${course.price}` : "Free"}</p>
                       <h3 className="mt-2 font-semibold">{course.title}</h3>
@@ -421,7 +421,7 @@ const LandingPage = () => {
                   <p className="mt-1 text-center text-lg font-semibold iq-link" style={heading}>Certificate</p>
                   <p className="mt-6 text-center text-[11px] uppercase tracking-[0.16em] iq-faint">This is to certify that</p>
                   <p className="mt-2 text-center text-2xl font-semibold" style={heading}>Learner name</p>
-                  <p className="mx-auto mt-4 max-w-sm text-center text-xs leading-relaxed iq-muted">has successfully completed the course conducted by IQmath Technologies, including the required assessment.</p>
+                  <p className="mx-auto mt-4 max-w-sm text-center text-xs leading-relaxed iq-muted">has successfully completed the <strong>Course Name</strong> training program conducted by <strong>IQMath Technologies</strong>, demonstrating a strong understanding of the concepts and practical skills covered throughout the program.</p>
                   <div className="mt-8 grid grid-cols-2 gap-4 text-center text-[11px]">
                     <div><p className="font-semibold">Malar Saravanan</p><p className="iq-faint">Chairman & Founder</p></div>
                     <div><p className="font-semibold">Eneeyan N</p><p className="iq-faint">Chief Mentor</p></div>

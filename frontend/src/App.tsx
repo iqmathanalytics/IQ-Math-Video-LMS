@@ -121,7 +121,14 @@ const ProtectedRoute = ({ children, requiredRole }: { children: any, requiredRol
 const PublicOnlyRoute = ({ children }: { children: any }) => {
   const session = getValidSession();
   if (!session?.token) return children;
-  return session.role === "instructor" ? <Navigate to="/dashboard" replace /> : <Navigate to="/student-dashboard" replace />;
+  if (session.role === "instructor") return <Navigate to="/dashboard" replace />;
+  // Honor ?next= so share → login (already signed in) still lands on that course in Courses.
+  const params = new URLSearchParams(window.location.search);
+  const next = params.get("next");
+  if (next && next.startsWith("/") && !next.startsWith("//")) {
+    return <Navigate to={next} replace />;
+  }
+  return <Navigate to="/student-dashboard" replace />;
 };
 
 const FallbackRoute = () => {

@@ -5,6 +5,7 @@ import {
   ChevronRight, Code, Menu, Settings, Users, FolderOpen, MessageSquare, Award, PlayCircle, Search
 } from "lucide-react";
 import BrandLogo from "./components/BrandLogo";
+import BackButton from "./components/BackButton";
 import ThemeToggle from "./components/ThemeToggle";
 import { useDayTheme } from "./public/useDayTheme";
 import { clearSession } from "./utils/session";
@@ -183,10 +184,11 @@ const DashboardLayout = () => {
 
         {/* HEADER */}
         <header className="relative z-30 h-20 border-b iq-line iq-header backdrop-blur-xl flex items-center justify-between px-6 lg:px-10 shrink-0">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 lg:gap-4">
             <button onClick={() => setMobileMenuOpen(true)} className="lg:hidden p-2 -ml-2 iq-muted">
               <Menu size={24} />
             </button>
+            <BackButton fallback="/dashboard" />
             <h1 className="text-xl lg:text-2xl font-semibold" style={{ fontFamily: '"Space Grotesk", Inter, sans-serif' }}>
               {menuItems.find(i => i.path === location.pathname)?.label
                 || (location.pathname.includes("/builder") ? "Course builder"

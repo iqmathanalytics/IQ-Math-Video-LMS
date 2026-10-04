@@ -8,8 +8,7 @@ import CourseFacts from "../components/CourseFacts";
 import PublicShell from "./PublicShell";
 import { getValidSession } from "../utils/session";
 
-type Lesson = { id: number; title: string; type?: string; duration?: number | null };
-type Module = { id: number; title: string; lesson_count?: number; lessons: Lesson[] };
+type Module = { id: number; title: string; lesson_count?: number; lessons?: { id: number }[] };
 type Shared = {
   id: number;
   title: string;
@@ -21,15 +20,6 @@ type Shared = {
   modules: Module[];
   module_count?: number;
   lesson_count?: number;
-  preview?: boolean;
-};
-
-const typeLabel = (type?: string) => {
-  const value = (type || "lesson").toLowerCase();
-  if (value.includes("assign")) return "Assignment";
-  if (value.includes("quiz") || value.includes("test")) return "Assessment";
-  if (value.includes("code")) return "Coding";
-  return "Lesson";
 };
 
 const SharedCourse = () => {
@@ -40,18 +30,17 @@ const SharedCourse = () => {
   const [modulesOpen, setModulesOpen] = useState(false);
   const session = getValidSession();
   const signedIn = Boolean(session?.token && session.role === "student");
-  const sharePath = `/share/courses/${courseId || ""}`;
-  const loginPath = `/login?next=${encodeURIComponent(sharePath)}`;
-  const coursesPath = "/courses";
+  const coursesPath = courseId ? `/courses?course=${encodeURIComponent(courseId)}` : "/courses";
+  const loginPath = `/login?next=${encodeURIComponent(coursesPath)}`;
 
   useEffect(() => {
     if (!courseId) {
       setStatus("missing");
       return;
     }
+    // Always load the public teaser (no auth) so the share page stays a curriculum preview.
     setStatus("loading");
-    const headers = session?.token ? { Authorization: `Bearer ${session.token}` } : undefined;
-    axios.get(`${API_BASE_URL}/public/courses/${courseId}`, { headers })
+    axios.get(`${API_BASE_URL}/public/courses/${courseId}`)
       .then((res) => {
         setCourse(res.data);
         setStatus("ready");
@@ -60,7 +49,18 @@ const SharedCourse = () => {
         setCourse(null);
         setStatus("missing");
       });
-  }, [courseId, session?.token]);
+  }, [courseId]);
+
+  if (!courseId) {
+    return (
+      <PublicShell title="Course">
+        <div className="mx-auto max-w-3xl px-4 py-16">
+          <h1 className="text-3xl font-semibold" style={{ fontFamily: '"Space Grotesk", Inter, sans-serif' }}>This course is not available</h1>
+          <Link to="/" className="mt-6 inline-flex rounded-full iq-accent-bg px-4 py-2 text-sm font-semibold">Back to home</Link>
+        </div>
+      </PublicShell>
+    );
+  }
 
   if (status === "loading") {
     return (
@@ -84,11 +84,10 @@ const SharedCourse = () => {
     );
   }
 
-  const preview = course.preview !== false && !signedIn;
-  const goLogin = () => navigate(loginPath);
-  const goCourses = () => navigate(coursesPath);
+  const continuePath = signedIn ? coursesPath : loginPath;
+  const goContinue = () => navigate(continuePath);
   const moduleCount = course.module_count ?? course.modules.length;
-  const lessonCount = course.lesson_count ?? course.modules.reduce((n, m) => n + (m.lesson_count ?? m.lessons.length), 0);
+  const lessonCount = course.lesson_count ?? course.modules.reduce((n, m) => n + (m.lesson_count ?? m.lessons?.length ?? 0), 0);
 
   return (
     <PublicShell title={course.title}>
@@ -105,7 +104,7 @@ const SharedCourse = () => {
         <div className="mt-4">
           <CourseFacts
             description={course.description}
-            onSyllabusClick={preview ? (event) => { event.preventDefault(); goLogin(); } : undefined}
+            onSyllabusClick={(event) => { event.preventDefault(); goContinue(); }}
           />
         </div>
 
@@ -114,9 +113,9 @@ const SharedCourse = () => {
             <div>
               <h2 className="text-2xl font-semibold" style={{ fontFamily: '"Space Grotesk", Inter, sans-serif' }}>Curriculum</h2>
               <p className="mt-2 text-sm iq-muted">
-                {preview
-                  ? "Module names only. Sign in to open lessons and enroll."
-                  : "Open a module or lesson to continue in your courses."}
+                {signedIn
+                  ? "Module names preview. Open Courses to enroll and access lessons."
+                  : "Module names only. Sign in to open this course and enroll."}
               </p>
             </div>
             {course.modules.length > 0 && (
@@ -152,47 +151,21 @@ const SharedCourse = () => {
               <ol className="mt-6 space-y-3">
                 {course.modules.map((module, index) => (
                   <li key={module.id} className="rounded-2xl border iq-line iq-surface p-4">
-                    {preview ? (
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.14em] iq-faint">Module {index + 1}</p>
-                        <h3 className="mt-1 text-lg font-semibold">{module.title}</h3>
-                        <p className="mt-1 text-xs iq-muted">
-                          {(module.lesson_count ?? module.lessons.length) || 0} lessons · Sign in to view details
-                        </p>
-                      </div>
-                    ) : (
-                      <div>
-                        <button type="button" onClick={goCourses} className="w-full text-left">
-                          <p className="text-xs uppercase tracking-[0.14em] iq-faint">Module {index + 1}</p>
-                          <h3 className="mt-1 text-lg font-semibold iq-link">{module.title}</h3>
-                        </button>
-                        <ul className="mt-3 space-y-2">
-                          {module.lessons.map((lesson, lessonIndex) => (
-                            <li key={lesson.id}>
-                              <button
-                                type="button"
-                                onClick={goCourses}
-                                className="flex w-full cursor-pointer items-start justify-between gap-3 border-t iq-line pt-2 text-left text-sm"
-                              >
-                                <span className="iq-subtle">
-                                  <span className="mr-2 tabular-nums iq-faint">{lessonIndex + 1}.</span>
-                                  {lesson.title}
-                                </span>
-                                <span className="shrink-0 text-xs iq-faint">{typeLabel(lesson.type)}</span>
-                              </button>
-                            </li>
-                          ))}
-                          {module.lessons.length === 0 && <li className="text-sm iq-muted">No lessons in this module yet.</li>}
-                        </ul>
-                      </div>
-                    )}
+                    <button type="button" onClick={goContinue} className="w-full text-left">
+                      <p className="text-xs uppercase tracking-[0.14em] iq-faint">Module {index + 1}</p>
+                      <h3 className="mt-1 text-lg font-semibold iq-link">{module.title}</h3>
+                      <p className="mt-1 text-xs iq-muted">
+                        {(module.lesson_count ?? module.lessons?.length) || 0} lessons ·{" "}
+                        {signedIn ? "Open in Courses" : "Sign in to open in Courses"}
+                      </p>
+                    </button>
                   </li>
                 ))}
               </ol>
 
-              {preview && (
+              {!signedIn && (
                 <div className="mt-4 rounded-2xl border iq-line p-4 text-center">
-                  <p className="text-sm iq-muted">Sign in to view the full course.</p>
+                  <p className="text-sm iq-muted">Sign in to open this course in your catalogue.</p>
                   <Link to={loginPath} className="mt-3 inline-flex rounded-full iq-accent-bg px-5 py-2.5 text-sm font-semibold">
                     Sign in to view
                   </Link>
@@ -206,15 +179,15 @@ const SharedCourse = () => {
           <h2 className="text-lg font-semibold">Ready to learn?</h2>
           <p className="mt-2 text-sm iq-muted">
             {signedIn
-              ? "Continue in your course catalogue to enroll and open lessons."
-              : "Sign in with your learner account to enroll and access lessons."}
+              ? "Continue in Courses to enroll and open lessons for this course."
+              : "Sign in with your learner account to open this course, enroll, and access lessons."}
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
-            <Link to={signedIn ? coursesPath : loginPath} className="rounded-full iq-accent-bg px-5 py-2.5 text-sm font-semibold">
-              {signedIn ? "Go to courses" : "Sign in to continue"}
+            <Link to={continuePath} className="rounded-full iq-accent-bg px-5 py-2.5 text-sm font-semibold">
+              {signedIn ? "Go to this course" : "Sign in to continue"}
             </Link>
             {!signedIn && (
-              <Link to={`/signup?next=${encodeURIComponent(sharePath)}`} className="rounded-full border iq-line px-5 py-2.5 text-sm font-semibold">
+              <Link to={`/signup?next=${encodeURIComponent(coursesPath)}`} className="rounded-full border iq-line px-5 py-2.5 text-sm font-semibold">
                 Create a learner account
               </Link>
             )}

@@ -10,4 +10,18 @@ export default defineConfig({
       overlay: false, // ✅ Fixes the WebSocket disconnect error
     },
   },
+  build: {
+    target: "es2020",
+    cssCodeSplit: true,
+    sourcemap: false,
+    chunkSizeWarningLimit: 900,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ["react", "react-dom", "react-router-dom"],
+          vendor: ["axios", "lucide-react"],
+        },
+      },
+    },
+  },
 })

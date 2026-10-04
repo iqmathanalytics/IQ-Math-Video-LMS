@@ -28,15 +28,13 @@ import requests
 import razorpay
 from certificate_pdf import create_certificate_pdf
 from certificate_ids import (
-    DEFAULT_TEMPLATE,
-    TEMPLATE_KEY,
-    SEQ_KEY,
-    ensure_certificate_settings,
-    get_setting,
+    apply_start_number,
+    course_id_payload,
     next_certificate_id,
-    preview_certificate_id,
-    set_setting,
-    validate_template,
+    normalize_code,
+    normalize_prefix,
+    normalize_start_number,
+    clamp_width,
 )
 import google.generativeai as genai 
 import re  
@@ -109,6 +107,10 @@ async def init_models():
                 ("content_items", "resource_links", "resource_links TEXT"),
                 ("course_assessments", "file_data", "file_data BLOB"),
                 ("submissions", "file_data", "file_data BLOB"),
+                ("courses", "cert_prefix", "cert_prefix VARCHAR(8) DEFAULT 'IQ'"),
+                ("courses", "cert_code", "cert_code VARCHAR(3)"),
+                ("courses", "cert_number_width", "cert_number_width INTEGER DEFAULT 3"),
+                ("courses", "cert_seq", "cert_seq INTEGER DEFAULT 0"),
             ):
                 try:
                     await sqlite_add(table, column, definition)
@@ -133,17 +135,14 @@ async def init_models():
                 await conn.execute(text("ALTER TABLE content_items MODIFY content TEXT;"))
                 await conn.execute(text("ALTER TABLE course_assessments ADD COLUMN IF NOT EXISTS file_data LONGBLOB;"))
                 await conn.execute(text("ALTER TABLE submissions ADD COLUMN IF NOT EXISTS file_data LONGBLOB;"))
+                await conn.execute(text("ALTER TABLE courses ADD COLUMN IF NOT EXISTS cert_prefix VARCHAR(8) DEFAULT 'IQ';"))
+                await conn.execute(text("ALTER TABLE courses ADD COLUMN IF NOT EXISTS cert_code VARCHAR(3);"))
+                await conn.execute(text("ALTER TABLE courses ADD COLUMN IF NOT EXISTS cert_number_width INT DEFAULT 3;"))
+                await conn.execute(text("ALTER TABLE courses ADD COLUMN IF NOT EXISTS cert_seq INT DEFAULT 0;"))
                 
                 print("Database migrations applied successfully.")
             except Exception as e:
                 print(f"Migration note: {e}")
-
-    # Seed certificate ID settings outside the DDL transaction.
-    try:
-        async with AsyncSessionLocal() as session:
-            await ensure_certificate_settings(session)
-    except Exception as e:
-        print(f"Certificate settings seed note: {e}")
 
     async with engine.begin() as conn:
         # One-time wipe of every notification for all users.
@@ -178,31 +177,6 @@ DEMO_USERS = (
     ("student@iqmath.com", "Demo Student", "student", "9000000001"),
     ("instructor@iqmath.com", "Demo Instructor", "instructor", "9000000002"),
 )
-
-SAMPLE_WATCH = (
-    ("Neural networks, explained · 3Blue1Brown", "aircAruvnKk"),
-    ("Python for beginners · freeCodeCamp.org", "rfscVS0vtbw"),
-    ("JavaScript for beginners · freeCodeCamp.org", "PkZNo7MFNFg"),
-    ("Git and GitHub for beginners · freeCodeCamp.org", "RGOj5yH7evk"),
-)
-
-async def ensure_sample_watch():
-    """Keep at least four YouTube sample lessons on the public watch list."""
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(select(models.WatchLesson))
-        rows = result.scalars().all()
-        existing = {row.youtube_id for row in rows}
-        missing = 4 - len(rows)
-        if missing <= 0:
-            return
-        for title, video_id in SAMPLE_WATCH:
-            if video_id in existing:
-                continue
-            session.add(models.WatchLesson(title=title, youtube_id=video_id))
-            missing -= 1
-            if missing <= 0:
-                break
-        await session.commit()
 
 async def ensure_demo_users():
     """Create local demo accounts when the app is running on SQLite."""
@@ -247,7 +221,6 @@ async def on_startup():
     async def prepare():
         try:
             await init_models()
-            await ensure_sample_watch()
             await ensure_demo_users()
             await warm_db_pool()
         except Exception as exc:
@@ -828,14 +801,24 @@ async def check_progress_status(user_id: int, course_id: int, db: AsyncSession):
     
     return completed_count, total_items, is_fully_completed
 
+def _is_legacy_certificate_id(value: str | None) -> bool:
+    text = (value or "").strip()
+    return (not text) or text.startswith("IQ-LMS-")
+
+
 async def generate_certificate_record(user_id: int, course_id: int, db: AsyncSession):
     # Check if cert already exists
     cert_check = await db.execute(select(models.UserCertificate).where(
         models.UserCertificate.user_id == user_id, 
         models.UserCertificate.course_id == course_id
     ))
-    if cert_check.scalars().first():
-        return True # Already exists
+    existing = cert_check.scalars().first()
+    if existing:
+        # Upgrade old IQ-LMS-… IDs to the admin per-course template.
+        if _is_legacy_certificate_id(existing.certificate_id):
+            existing.certificate_id = await next_certificate_id(db, user_id, course_id)
+            await db.commit()
+        return True
 
     certificate_id = await next_certificate_id(db, user_id, course_id)
     new_cert = models.UserCertificate(
@@ -1459,7 +1442,7 @@ async def get_courses(db: AsyncSession = Depends(get_db), current_user: models.U
 
 @app.get("/api/v1/public/courses")
 async def public_courses(response: Response, db: AsyncSession = Depends(get_db)):
-    response.headers["Cache-Control"] = "public, max-age=30"
+    response.headers["Cache-Control"] = "public, max-age=120, stale-while-revalidate=300"
     res = await db.execute(select(models.Course).where(models.Course.is_published == True).order_by(models.Course.id.desc()))
     rows = []
     for course in res.scalars().all():
@@ -1480,7 +1463,7 @@ async def public_course_share(
     Guests get a teaser (module 1 + first 2 lessons). Signed-in students get the full outline.
     """
     is_student = bool(current_user and current_user.role == "student")
-    response.headers["Cache-Control"] = "private, no-store" if is_student else "public, max-age=30"
+    response.headers["Cache-Control"] = "private, no-store" if is_student else "public, max-age=120, stale-while-revalidate=300"
     result = await db.execute(
         select(models.Course)
         .options(selectinload(models.Course.modules).selectinload(models.Module.items))
@@ -2212,6 +2195,12 @@ async def generate_pdf_endpoint(course_id: int, db: AsyncSession = Depends(get_d
     if not certificate:
         raise HTTPException(status_code=403, detail="Certificate not yet earned. Please complete the course and click 'Claim Certificate' first.")
 
+    # Upgrade legacy IQ-LMS-… IDs to the admin per-course template before printing.
+    if _is_legacy_certificate_id(certificate.certificate_id):
+        certificate.certificate_id = await next_certificate_id(db, current_user.id, course_id)
+        await db.commit()
+        await db.refresh(certificate)
+
     # 2. Fetch Course Details
     res = await db.execute(select(models.Course).where(models.Course.id == course_id))
     course = res.scalars().first()
@@ -2220,16 +2209,23 @@ async def generate_pdf_endpoint(course_id: int, db: AsyncSession = Depends(get_d
     # We use the date they actually earned it (certificate.issued_at) rather than current time
     formatted_date = certificate.issued_at.strftime("%B %d, %Y")
     
+    # Same certificate wording for every course: only student name, course title, and cert ID vary.
+    # Course description / Drive links / images are never printed on the PDF.
     pdf = await asyncio.to_thread(
         create_certificate_pdf,
         current_user.full_name,
-        course.title,
+        course.title or "",
         formatted_date,
         certificate.certificate_id,
-        course.description or "",
+        "",  # description intentionally unused
         course.course_type or "",
     )
-    return StreamingResponse(pdf, media_type="application/pdf")
+    headers = {
+        "Content-Disposition": f'attachment; filename="{re.sub(r"[^A-Za-z0-9_-]+", "_", (course.title or "certificate").strip())}_Certificate.pdf"',
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        "Pragma": "no-cache",
+    }
+    return StreamingResponse(pdf, media_type="application/pdf", headers=headers)
 
 async def enrolled_courses_for(db: AsyncSession, current_user: models.User):
     # 1. Fetch enrollments with course details AND certificates
@@ -2754,62 +2750,67 @@ async def admin_certificates(db: AsyncSession = Depends(get_db), current_user: m
     return rows
 
 
-class CertificateIdSettingsUpdate(BaseModel):
-    template: str
+class CourseCertificateIdUpdate(BaseModel):
+    prefix: str = "IQ"
+    code: str
+    number_width: int = 3
+    start_number: int = 1
 
 
-@app.get("/api/v1/admin/certificate-id-settings")
-async def get_certificate_id_settings(
+@app.get("/api/v1/admin/certificate-id-courses")
+async def list_certificate_id_courses(
     db: AsyncSession = Depends(get_db),
     current_user: models.User = Depends(require_instructor),
 ):
-    await ensure_certificate_settings(db)
-    template = await get_setting(db, TEMPLATE_KEY, DEFAULT_TEMPLATE)
-    raw_seq = await get_setting(db, SEQ_KEY, "0")
-    try:
-        current_seq = int(raw_seq or "0")
-    except ValueError:
-        current_seq = 0
-    next_seq = current_seq + 1
-    return {
-        "template": template,
-        "current_seq": current_seq,
-        "next_seq": next_seq,
-        "preview": preview_certificate_id(template, next_seq),
-        "tokens": [
-            "{YYYY}", "{YY}", "{MM}", "{DD}",
-            "{SEQ}", "{SEQ:n}",
-            "{COURSE_ID}", "{USER_ID}",
-        ],
-    }
+    res = await db.execute(select(models.Course).order_by(models.Course.title.asc()))
+    return [course_id_payload(course) for course in res.scalars().all()]
 
 
-@app.put("/api/v1/admin/certificate-id-settings")
-async def put_certificate_id_settings(
-    body: CertificateIdSettingsUpdate,
+@app.get("/api/v1/admin/courses/{course_id}/certificate-id")
+async def get_course_certificate_id(
+    course_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: models.User = Depends(require_instructor),
 ):
+    res = await db.execute(select(models.Course).where(models.Course.id == course_id))
+    course = res.scalars().first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    return course_id_payload(course)
+
+
+@app.put("/api/v1/admin/courses/{course_id}/certificate-id")
+async def put_course_certificate_id(
+    course_id: int,
+    body: CourseCertificateIdUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(require_instructor),
+):
+    res = await db.execute(select(models.Course).where(models.Course.id == course_id))
+    course = res.scalars().first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
     try:
-        template = validate_template(body.template)
+        prefix = normalize_prefix(body.prefix)
+        code = normalize_code(body.code)
+        width = clamp_width(body.number_width)
+        current = int(course.cert_seq or 0)
+        # Allow saving the same next number again without error.
+        if int(body.start_number) == current + 1:
+            start = current + 1
+        else:
+            start = normalize_start_number(body.start_number, current_seq=current)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    await ensure_certificate_settings(db)
-    await set_setting(db, TEMPLATE_KEY, template)
+    course.cert_prefix = prefix
+    course.cert_code = code
+    course.cert_number_width = width
+    apply_start_number(course, start)
     await db.commit()
-    raw_seq = await get_setting(db, SEQ_KEY, "0")
-    try:
-        current_seq = int(raw_seq or "0")
-    except ValueError:
-        current_seq = 0
-    next_seq = current_seq + 1
-    return {
-        "template": template,
-        "current_seq": current_seq,
-        "next_seq": next_seq,
-        "preview": preview_certificate_id(template, next_seq),
-        "message": "Certificate ID template saved. Existing certificates keep their IDs.",
-    }
+    await db.refresh(course)
+    payload = course_id_payload(course)
+    payload["message"] = "Certificate ID format saved for this course. Existing certificates keep their IDs."
+    return payload
 
 @app.delete("/api/v1/admin/students/{user_id}")
 async def delete_student(user_id: int, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_instructor)):
@@ -2955,7 +2956,7 @@ def watch_lesson_out(row: models.WatchLesson) -> dict:
 
 @app.get("/api/v1/watch")
 async def list_watch_lessons(response: Response, db: AsyncSession = Depends(get_db)):
-    response.headers["Cache-Control"] = "public, max-age=30"
+    response.headers["Cache-Control"] = "public, max-age=120, stale-while-revalidate=300"
     res = await db.execute(select(models.WatchLesson).order_by(models.WatchLesson.id.desc()))
     return [watch_lesson_out(row) for row in res.scalars().all()]
 

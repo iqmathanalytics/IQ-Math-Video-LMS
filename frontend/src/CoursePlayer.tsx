@@ -5,14 +5,15 @@ import Editor from "@monaco-editor/react";
 import API_BASE_URL from './config';
 import { runTestCasesLocally } from './utils/pyodideEnv';
 import {
-    PlayCircle, FileText, ChevronLeft, Menu, Code, HelpCircle,
+    PlayCircle, FileText, Menu, Code, HelpCircle,
     UploadCloud, Play, Save, Monitor, Cpu, ChevronDown, ChevronRight, CreditCard,
     File as FileIcon, X, CheckCircle, Radio, Lock, ArrowLeft, AlertCircle, Clock,
     Zap, CheckSquare, Square, CheckCheck, Award, Edit, AlertTriangle, LockKeyhole, Cloud, Link as ResourceLinkIcon // <--- Added 'Cloud' icon here
 } from "lucide-react";
 import { CODE_TEMPLATES } from './utils/codeTemplates';
 import { checkoutKey, ensureRazorpay, razorpayPaylink, withPaymentMethods } from './utils/razorpay';
-import { youtubeIdFromLink } from './utils/youtube';
+import BackButton from './components/BackButton';
+import LessonMedia from './components/LessonMedia';
 
 
 
@@ -581,7 +582,7 @@ const CodingPlayer = ({ course, token }: { course: any, token: string }) => {
             <div className="max-w-6xl mx-auto">
                 <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 lg:mb-10 gap-4">
                     <div className="flex items-center gap-4">
-                        <button onClick={() => navigate("/student-dashboard")} className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-500"><ChevronLeft size={20} /></button>
+                        <BackButton fallback="/my-courses" always className="!border-slate-200 !bg-white !text-slate-700" />
                         <div>
                             <h1 className="text-2xl lg:text-3xl font-extrabold text-slate-900 m-0">{course.title}</h1>
                             <p className="text-slate-500 text-sm mt-1">Language: <span className="font-bold text-[#005EB8] uppercase">{course.language}</span></p>
@@ -659,31 +660,9 @@ const CodingPlayer = ({ course, token }: { course: any, token: string }) => {
         </div>
     )
 };
-const LessonVideo = ({ lesson }: { lesson: any }) => {
-    const raw = String(lesson.url || "");
-    const videoId = youtubeIdFromLink(raw);
-    const drive = raw.match(/drive\.google\.com\/file\/d\/([\w-]+)/);
-    const src = videoId
-        ? `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`
-        : drive
-            ? `https://drive.google.com/file/d/${drive[1]}/preview`
-            : raw.includes("drive.google.com")
-                ? raw.replace(/\/view.*/, "/preview").replace(/\/edit.*/, "/preview")
-                : "";
-    if (!src) return <div className="p-10 text-center text-white">This lesson has no playable video.</div>;
-    return (
-        <div className="aspect-video w-full bg-black">
-            <iframe
-                key={src}
-                className="h-full w-full"
-                src={src}
-                title={lesson.title || "Lesson"}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-            />
-        </div>
-    );
-};
+const LessonVideo = ({ lesson, onEnded }: { lesson: any; onEnded?: () => void }) => (
+    <LessonMedia url={String(lesson.url || "")} title={lesson.title || "Lesson"} onEnded={onEnded} />
+);
 
 // --- 🕵️ PROCTORING COMPONENT (FIXED) ---
 const LiveTestProctor = ({ lesson }: { lesson: any }) => {
@@ -1076,9 +1055,18 @@ const CoursePlayer = () => {
                         break;
                     }
                 }
-                if (pickedModule) setExpandedModules([pickedModule.id]);
-                const first = picked || pickedModule?.lessons?.[0];
-                if (first && !activeLesson) setActiveLesson(first);
+                if (pickedModule) setExpandedModules((prev) => (prev.length ? prev : [pickedModule.id]));
+                const first = picked || pickedModule?.lessons?.[0] || null;
+                setActiveLesson((current: any) => {
+                    if (requested && picked) return picked;
+                    if (current) {
+                        for (const module of modules) {
+                            const match = (module.lessons || []).find((lesson: { id: number }) => String(lesson.id) === String(current.id));
+                            if (match) return match;
+                        }
+                    }
+                    return first;
+                });
             } catch (err: any) {
                 console.error(err);
 
@@ -1189,13 +1177,33 @@ const CoursePlayer = () => {
         } catch (err) { console.error("Upload Error:", err); triggerToast("❌ Upload Failed. Please try again.", "error"); } finally { setUploading(false); }
     };
 
-    const handleToggleComplete = async (lesson: any) => {
+    const applyLessonComplete = (lessonId: number | string, completed: boolean) => {
+        setActiveLesson((prev: any) => (prev && String(prev.id) === String(lessonId) ? { ...prev, is_completed: completed } : prev));
+        setCourse((prev: any) => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                modules: (prev.modules || []).map((module: any) => ({
+                    ...module,
+                    lessons: (module.lessons || []).map((lesson: any) =>
+                        String(lesson.id) === String(lessonId) ? { ...lesson, is_completed: completed } : lesson
+                    ),
+                })),
+            };
+        });
+    };
+
+    const handleToggleComplete = async (lesson: any, opts?: { quiet?: boolean }) => {
+        if (!lesson || lesson.is_completed) return;
+        applyLessonComplete(lesson.id, true);
         try {
             const token = localStorage.getItem("token");
             await axios.post(`${API_BASE_URL}/content/${lesson.id}/complete`, {}, { headers: { Authorization: `Bearer ${token}` } });
-            triggerToast("Marked as complete", "success");
-            setRefreshTrigger(prev => prev + 1);
-        } catch (err) { triggerToast("Failed to update status", "error"); }
+            if (!opts?.quiet) triggerToast("Marked as complete", "success");
+        } catch (err) {
+            applyLessonComplete(lesson.id, false);
+            if (!opts?.quiet) triggerToast("Failed to update status", "error");
+        }
     };
 
     const handleClaimCertificate = () => {
@@ -1213,10 +1221,15 @@ const CoursePlayer = () => {
         const completionHeader = (
             <div className="bg-slate-50 border-b border-slate-200 p-4 flex justify-between items-center">
                 <h3 className="font-bold text-slate-800">{activeLesson.title}</h3>
-                <div onClick={() => handleToggleComplete(activeLesson)} className={`flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-all border ${activeLesson.is_completed ? "bg-green-100 border-green-300 text-green-700" : "bg-white border-slate-300 text-slate-500 hover:bg-slate-100"}`}>
+                <button
+                    type="button"
+                    onClick={() => { void handleToggleComplete(activeLesson); }}
+                    disabled={Boolean(activeLesson.is_completed)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all border ${activeLesson.is_completed ? "bg-green-100 border-green-300 text-green-700 cursor-default" : "bg-white border-slate-300 text-slate-500 hover:bg-slate-100 cursor-pointer"}`}
+                >
                     {activeLesson.is_completed ? <CheckSquare size={20} /> : <Square size={20} />}
                     <span className="text-sm font-bold">{activeLesson.is_completed ? "Completed" : "Mark as Complete"}</span>
-                </div>
+                </button>
             </div>
         );
 
@@ -1230,7 +1243,11 @@ const CoursePlayer = () => {
             contentBody = (
                 <div className="h-full overflow-y-auto bg-slate-100 p-4 lg:p-6">
                     <div className="max-w-5xl mx-auto bg-black rounded-xl overflow-hidden shadow-xl">
-                        <LessonVideo key={activeLesson.id} lesson={activeLesson} />
+                        <LessonVideo
+                            key={activeLesson.id}
+                            lesson={activeLesson}
+                            onEnded={() => { void handleToggleComplete(activeLesson, { quiet: true }); }}
+                        />
                     </div>
                     {resourceLinks.length > 0 && (
                         <div className="max-w-5xl mx-auto mt-4 bg-white border border-slate-200 rounded-xl p-4">
@@ -1325,13 +1342,9 @@ const CoursePlayer = () => {
             <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-50 relative overflow-hidden font-sans">
                 <ToastNotification toast={toast} setToast={setToast} />
 
-                {/* ✅ FIXED BACK BUTTON: Added z-50 to ensure it's on top */}
-                <button
-                    onClick={() => navigate("/student-dashboard")}
-                    className="absolute top-8 left-8 flex items-center gap-2 text-slate-500 hover:text-slate-800 font-bold transition-colors z-50 cursor-pointer"
-                >
-                    <ArrowLeft size={20} /> Back to Dashboard
-                </button>
+                <div className="absolute top-8 left-8 z-50">
+                    <BackButton fallback="/my-courses" always className="!border-slate-200 !bg-white !text-slate-700" />
+                </div>
 
                 <div className="bg-white p-10 rounded-3xl shadow-xl text-center max-w-md w-full border border-slate-200 animate-fade-in-up relative z-10">
                     <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -1382,30 +1395,30 @@ const CoursePlayer = () => {
             <div className="flex-1 flex flex-col h-full relative z-0">
                 <header className="h-16 bg-white border-b border-slate-200 flex items-center px-4 lg:px-6 justify-between z-10 shrink-0">
                     <div className="flex items-center gap-4">
-                        <button onClick={() => navigate("/student-dashboard")} className="bg-none border-none cursor-pointer text-slate-500 flex items-center gap-2 font-semibold hover:text-slate-800 text-xs lg:text-sm"><ChevronLeft size={20} /> <span className="hidden sm:inline">Dashboard</span></button>
+                        <BackButton fallback="/my-courses" always className="!border-slate-200 !bg-white !text-slate-700" />
                         <div className="h-6 w-px bg-slate-200 hidden sm:block"></div>
                         <h1 className="text-sm lg:text-base font-bold text-slate-900 m-0 max-w-[200px] lg:max-w-[400px] truncate">{course?.title || activeLesson?.title || "Course Player"}</h1>
                     </div>
                     <div className="flex items-center gap-2 lg:gap-4">
                         {localStorage.getItem("role") === "instructor" && (<button onClick={handleEditClick} className="hidden lg:flex items-center gap-2 bg-slate-100 text-slate-700 px-3 py-2 rounded-lg font-bold border border-slate-200 hover:bg-slate-200 transition-colors text-sm"><Edit size={16} /> Edit Course</button>)}
                         {Number(course?.price) > 0 && course?.enrollment_type !== "paid" && <button onClick={handlePayment} className="hidden sm:flex items-center gap-2 bg-[#87C232] text-white px-4 py-2 rounded-lg font-bold border-none cursor-pointer hover:bg-[#76a82b] transition-colors text-xs lg:text-sm"><CreditCard size={18} /> Buy access</button>}
-                        <button onClick={() => setNotesOpen((open) => !open)} className="flex items-center gap-2 bg-slate-100 text-slate-700 px-3 py-2 rounded-lg font-bold border border-slate-200 text-xs lg:text-sm">{notesOpen ? "Hide notes" : "Notes"}</button>
+                        <button onClick={() => setNotesOpen((open) => !open)} className="flex items-center gap-2 rounded-lg border iq-line iq-surface px-3 py-2 text-xs font-bold lg:text-sm" style={{ color: "var(--iq-text)" }}>{notesOpen ? "Hide notes" : "Notes"}</button>
                         <button onClick={() => setSidebarOpen(!sidebarOpen)} className="bg-none border-none cursor-pointer p-2 hover:bg-slate-100 rounded-lg"><Menu color={brand.textMain} size={24} /></button>
                     </div>
                 </header>
                 <div className={`flex-1 flex min-h-0 bg-white overflow-hidden ${notesOpen ? "flex-col lg:flex-row" : ""}`}>
                     <div className="min-h-0 min-w-0 flex-1 overflow-hidden">{renderContent()}</div>
                     {notesOpen && activeLesson && (
-                        <aside className="flex h-56 shrink-0 flex-col border-t border-slate-200 bg-white p-4 lg:h-auto lg:w-80 lg:border-l lg:border-t-0">
+                        <aside className="iq-notes-panel flex h-56 shrink-0 flex-col border-t iq-line p-4 lg:h-auto lg:w-80 lg:border-l lg:border-t-0">
                             <div className="flex items-center justify-between gap-3">
-                                <h2 className="text-sm font-bold text-slate-900">Notes</h2>
-                                <span className="text-xs text-slate-400">{noteState}</span>
+                                <h2 className="iq-notes-title text-sm">Notes</h2>
+                                <span className="text-xs iq-faint">{noteState}</span>
                             </div>
                             <textarea
                                 value={lessonNote}
                                 onChange={(event) => setLessonNote(event.target.value)}
                                 placeholder="Write what you want to remember from this lesson."
-                                className="mt-3 min-h-0 flex-1 resize-none rounded-xl border border-slate-200 p-3 text-sm text-slate-800"
+                                className="iq-notes-field mt-3 min-h-0 flex-1 resize-none"
                             />
                         </aside>
                     )}

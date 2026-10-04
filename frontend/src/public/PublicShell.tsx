@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Menu, Search, X } from "lucide-react";
 import BrandLogo from "../components/BrandLogo";
+import BackButton from "../components/BackButton";
 import ThemeToggle from "../components/ThemeToggle";
 import { NAV } from "./catalog";
 import { useDayTheme } from "./useDayTheme";
@@ -111,7 +112,12 @@ const PublicShell = ({ title, children }: { title?: string; children: ReactNode 
         </div>
       )}
 
-      <main id="content">{children}</main>
+      <main id="content">
+        <div className="mx-auto max-w-6xl px-4 pt-4">
+          <BackButton fallback="/" />
+        </div>
+        {children}
+      </main>
 
       <footer className="border-t iq-line">
         <div className={`mx-auto grid max-w-6xl gap-8 px-4 py-12 ${NAV.length > 0 ? "sm:grid-cols-2" : ""}`}>
