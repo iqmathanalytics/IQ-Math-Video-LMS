@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
-import { ChevronDown, ChevronUp, Lock } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import API_BASE_URL from "../config";
 import CourseCover from "../components/CourseCover";
 import CourseFacts from "../components/CourseFacts";
 import PublicShell from "./PublicShell";
 import { getValidSession } from "../utils/session";
 
-type Lesson = { id: number; title: string; type?: string; duration?: number | null; locked?: boolean };
-type Module = { id: number; title: string; locked?: boolean; lessons: Lesson[] };
+type Lesson = { id: number; title: string; type?: string; duration?: number | null };
+type Module = { id: number; title: string; lesson_count?: number; lessons: Lesson[] };
 type Shared = {
   id: number;
   title: string;
@@ -42,7 +42,7 @@ const SharedCourse = () => {
   const signedIn = Boolean(session?.token && session.role === "student");
   const sharePath = `/share/courses/${courseId || ""}`;
   const loginPath = `/login?next=${encodeURIComponent(sharePath)}`;
-  const continuePath = signedIn ? "/courses" : loginPath;
+  const coursesPath = "/courses";
 
   useEffect(() => {
     if (!courseId) {
@@ -86,6 +86,9 @@ const SharedCourse = () => {
 
   const preview = course.preview !== false && !signedIn;
   const goLogin = () => navigate(loginPath);
+  const goCourses = () => navigate(coursesPath);
+  const moduleCount = course.module_count ?? course.modules.length;
+  const lessonCount = course.lesson_count ?? course.modules.reduce((n, m) => n + (m.lesson_count ?? m.lessons.length), 0);
 
   return (
     <PublicShell title={course.title}>
@@ -94,7 +97,7 @@ const SharedCourse = () => {
         <p className="mt-2 text-sm iq-muted">
           {Number(course.price) > 0 ? `₹${course.price}` : "Free"}
           {course.language ? ` · ${course.language}` : ""}
-          {` · ${course.module_count ?? course.modules.length} modules · ${course.lesson_count ?? course.modules.reduce((n, m) => n + m.lessons.length, 0)} lessons`}
+          {` · ${moduleCount} modules · ${lessonCount} lessons`}
         </p>
         <div className="mt-6 overflow-hidden rounded-2xl border iq-line">
           <CourseCover title={course.title} imageUrl={course.image_url} className="rounded-none" size="medium" priority />
@@ -112,8 +115,8 @@ const SharedCourse = () => {
               <h2 className="text-2xl font-semibold" style={{ fontFamily: '"Space Grotesk", Inter, sans-serif' }}>Curriculum</h2>
               <p className="mt-2 text-sm iq-muted">
                 {preview
-                  ? "Preview the first lessons. Sign in to view the full course."
-                  : "Modules and lessons in this course."}
+                  ? "Module names only. Sign in to open lessons and enroll."
+                  : "Open a module or lesson to continue in your courses."}
               </p>
             </div>
             {course.modules.length > 0 && (
@@ -135,10 +138,8 @@ const SharedCourse = () => {
               onClick={() => setModulesOpen(true)}
               className="mt-6 w-full rounded-2xl border iq-line iq-surface p-5 text-left"
             >
-              <p className="text-sm font-semibold">
-                {course.module_count ?? course.modules.length} modules · {course.lesson_count ?? course.modules.reduce((n, m) => n + m.lessons.length, 0)} lessons
-              </p>
-              <p className="mt-1 text-sm iq-muted">Click Expand modules to view the curriculum.</p>
+              <p className="text-sm font-semibold">{moduleCount} modules · {lessonCount} lessons</p>
+              <p className="mt-1 text-sm iq-muted">Click Expand modules to view the list.</p>
             </button>
           )}
 
@@ -148,76 +149,47 @@ const SharedCourse = () => {
 
           {modulesOpen && (
             <>
-              <ol className="mt-6 space-y-4">
-                {course.modules.map((module, index) => {
-                  const moduleLocked = preview && (module.locked || index > 0);
-                  return (
-                    <li
-                      key={module.id}
-                      className={`relative overflow-hidden rounded-2xl border iq-line iq-surface ${moduleLocked ? "p-3" : "p-5"}`}
-                    >
-                      {moduleLocked ? (
-                        <button type="button" onClick={goLogin} className="block w-full text-left">
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="text-xs uppercase tracking-[0.14em] iq-faint">Module {index + 1}</p>
-                              <h3 className="mt-1 truncate text-base font-semibold blur-[3px] select-none" aria-hidden>Locked module title</h3>
-                            </div>
-                            <span className="inline-flex shrink-0 items-center gap-1 rounded-full border iq-line px-2.5 py-1 text-xs iq-muted">
-                              <Lock size={12} /> Sign in to view
-                            </span>
-                          </div>
-                          <ul className="mt-2 max-h-16 space-y-1 overflow-hidden opacity-70">
-                            {(module.lessons.length ? module.lessons : [{ id: -1, title: "Locked", locked: true }]).slice(0, 2).map((lesson) => (
-                              <li key={lesson.id} className="truncate text-sm blur-[3px] select-none" aria-hidden>
-                                Session title locked
-                              </li>
-                            ))}
-                          </ul>
-                        </button>
-                      ) : (
-                        <>
+              <ol className="mt-6 space-y-3">
+                {course.modules.map((module, index) => (
+                  <li key={module.id} className="rounded-2xl border iq-line iq-surface p-4">
+                    {preview ? (
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.14em] iq-faint">Module {index + 1}</p>
+                        <h3 className="mt-1 text-lg font-semibold">{module.title}</h3>
+                        <p className="mt-1 text-xs iq-muted">
+                          {(module.lesson_count ?? module.lessons.length) || 0} lessons · Sign in to view details
+                        </p>
+                      </div>
+                    ) : (
+                      <div>
+                        <button type="button" onClick={goCourses} className="w-full text-left">
                           <p className="text-xs uppercase tracking-[0.14em] iq-faint">Module {index + 1}</p>
-                          <h3 className="mt-1 text-lg font-semibold">{module.title}</h3>
-                          <ul className="mt-3 space-y-2">
-                            {module.lessons.map((lesson, lessonIndex) => {
-                              const lessonLocked = preview && (lesson.locked || lessonIndex >= 2);
-                              if (lessonLocked) {
-                                return (
-                                  <li key={lesson.id}>
-                                    <button
-                                      type="button"
-                                      onClick={goLogin}
-                                      className="flex w-full items-center justify-between gap-3 border-t iq-line pt-2 text-left text-sm"
-                                    >
-                                      <span className="min-w-0 flex-1 truncate blur-[3px] select-none iq-subtle" aria-hidden>
-                                        Locked session title
-                                      </span>
-                                      <span className="inline-flex shrink-0 items-center gap-1 text-xs iq-faint">
-                                        <Lock size={12} /> Sign in to view
-                                      </span>
-                                    </button>
-                                  </li>
-                                );
-                              }
-                              return (
-                                <li key={lesson.id} className="flex items-start justify-between gap-3 border-t iq-line pt-2 text-sm">
-                                  <span className="iq-subtle">
-                                    <span className="mr-2 tabular-nums iq-faint">{lessonIndex + 1}.</span>
-                                    {lesson.title}
-                                  </span>
-                                  <span className="shrink-0 text-xs iq-faint">{typeLabel(lesson.type)}</span>
-                                </li>
-                              );
-                            })}
-                            {module.lessons.length === 0 && <li className="text-sm iq-muted">No lessons in this module yet.</li>}
-                          </ul>
-                        </>
-                      )}
-                    </li>
-                  );
-                })}
+                          <h3 className="mt-1 text-lg font-semibold iq-link">{module.title}</h3>
+                        </button>
+                        <ul className="mt-3 space-y-2">
+                          {module.lessons.map((lesson, lessonIndex) => (
+                            <li key={lesson.id}>
+                              <button
+                                type="button"
+                                onClick={goCourses}
+                                className="flex w-full cursor-pointer items-start justify-between gap-3 border-t iq-line pt-2 text-left text-sm"
+                              >
+                                <span className="iq-subtle">
+                                  <span className="mr-2 tabular-nums iq-faint">{lessonIndex + 1}.</span>
+                                  {lesson.title}
+                                </span>
+                                <span className="shrink-0 text-xs iq-faint">{typeLabel(lesson.type)}</span>
+                              </button>
+                            </li>
+                          ))}
+                          {module.lessons.length === 0 && <li className="text-sm iq-muted">No lessons in this module yet.</li>}
+                        </ul>
+                      </div>
+                    )}
+                  </li>
+                ))}
               </ol>
+
               {preview && (
                 <div className="mt-4 rounded-2xl border iq-line p-4 text-center">
                   <p className="text-sm iq-muted">Sign in to view the full course.</p>
@@ -234,12 +206,12 @@ const SharedCourse = () => {
           <h2 className="text-lg font-semibold">Ready to learn?</h2>
           <p className="mt-2 text-sm iq-muted">
             {signedIn
-              ? "Open the course catalogue to enroll and continue learning."
+              ? "Continue in your course catalogue to enroll and open lessons."
               : "Sign in with your learner account to enroll and access lessons."}
           </p>
           <div className="mt-4 flex flex-wrap gap-3">
-            <Link to={continuePath} className="rounded-full iq-accent-bg px-5 py-2.5 text-sm font-semibold">
-              {signedIn ? "Continue to courses" : "Sign in to continue"}
+            <Link to={signedIn ? coursesPath : loginPath} className="rounded-full iq-accent-bg px-5 py-2.5 text-sm font-semibold">
+              {signedIn ? "Go to courses" : "Sign in to continue"}
             </Link>
             {!signedIn && (
               <Link to={`/signup?next=${encodeURIComponent(sharePath)}`} className="rounded-full border iq-line px-5 py-2.5 text-sm font-semibold">

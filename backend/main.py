@@ -1500,57 +1500,20 @@ async def public_course_share(
                 "title": module.title,
                 "order": module.order,
                 "locked": False,
+                "lesson_count": len(sorted_items),
                 "lessons": lessons,
             })
             continue
 
-        # Guest teaser: clear module 1 + first 2 lessons; everything else is a locked stub.
-        if module_index == 0:
-            lessons = []
-            for lesson_index, item in enumerate(sorted_items):
-                if lesson_index < 2:
-                    lessons.append({
-                        "id": item.id,
-                        "title": item.title,
-                        "type": item.type,
-                        "order": item.order,
-                        "duration": item.duration,
-                        "locked": False,
-                    })
-                else:
-                    lessons.append({
-                        "id": item.id,
-                        "title": "Locked",
-                        "type": item.type,
-                        "order": item.order,
-                        "duration": None,
-                        "locked": True,
-                    })
-            modules.append({
-                "id": module.id,
-                "title": module.title,
-                "order": module.order,
-                "locked": False,
-                "lessons": lessons,
-            })
-        else:
-            modules.append({
-                "id": module.id,
-                "title": "Locked",
-                "order": module.order,
-                "locked": True,
-                "lessons": [
-                    {
-                        "id": item.id,
-                        "title": "Locked",
-                        "type": item.type,
-                        "order": item.order,
-                        "duration": None,
-                        "locked": True,
-                    }
-                    for item in sorted_items
-                ],
-            })
+        # Guests: module titles only — no lesson details until sign-in.
+        modules.append({
+            "id": module.id,
+            "title": module.title,
+            "order": module.order,
+            "locked": False,
+            "lesson_count": len(sorted_items),
+            "lessons": [],
+        })
 
     brief = course_brief(course)
     brief.pop("instructor_id", None)
