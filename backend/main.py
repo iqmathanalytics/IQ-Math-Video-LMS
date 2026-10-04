@@ -120,6 +120,25 @@ async def init_models():
             print("Database migrations applied successfully.")
         except Exception as e:
             print(f"Migration note: {e}")
+
+        # One-time wipe of every notification for all users.
+        try:
+            await conn.execute(text(
+                "CREATE TABLE IF NOT EXISTS app_flags ("
+                "name VARCHAR(64) PRIMARY KEY, "
+                "applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+            ))
+            flag = await conn.execute(text(
+                "SELECT name FROM app_flags WHERE name = 'clear_all_notifications_v1' LIMIT 1"
+            ))
+            if flag.first() is None:
+                await conn.execute(text("DELETE FROM notifications"))
+                await conn.execute(text(
+                    "INSERT INTO app_flags (name) VALUES ('clear_all_notifications_v1')"
+                ))
+                print("Cleared all notifications for every user.")
+        except Exception as e:
+            print(f"Notification clear note: {e}")
             
             
 app = FastAPI(title="iQmath Pro - Military Grade API")
@@ -976,10 +995,6 @@ async def create_code_test(test: CodeTestCreate, db: AsyncSession = Depends(get_
         new_prob = models.Problem(test_id=new_test.id, title=prob.title, description=prob.description, difficulty=prob.difficulty, test_cases=prob.test_cases)
         db.add(new_prob)
     await db.commit()
-    students = await db.execute(select(models.User.id).where(models.User.role == "student"))
-    for uid in students.scalars().all():
-        db.add(models.Notification(user_id=uid, title="New Code Arena!", message=f"Challenge '{test.title}' is live. Test your skills now!", created_at=datetime.utcnow()))
-    await db.commit()
     return {"message": "Test Created Successfully!"}
 
 @app.get("/api/v1/courses/{course_id}")
@@ -1457,10 +1472,6 @@ async def create_course(course: CourseCreate, db: AsyncSession = Depends(get_db)
     db.add(new_course)
     await db.commit()
     await db.refresh(new_course)
-    students = await db.execute(select(models.User.id).where(models.User.role == "student"))
-    for uid in students.scalars().all():
-        db.add(models.Notification(user_id=uid, title="New Course Alert!", message=f"New course '{new_course.title}' is now available.", created_at=datetime.utcnow()))
-    await db.commit()
     return new_course
 
 @app.post("/api/v1/courses/{course_id}/modules")
@@ -3225,6 +3236,12 @@ async def delete_notification(notif_id: int, db: AsyncSession = Depends(get_db),
     await db.execute(delete(models.Notification).where(models.Notification.id == notif_id, models.Notification.user_id == current_user.id))
     await db.commit()
     return {"message": "Deleted"}
+
+@app.delete("/api/v1/notifications")
+async def clear_all_notifications(db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_instructor)):
+    result = await db.execute(delete(models.Notification))
+    await db.commit()
+    return {"message": "All notifications removed.", "deleted": result.rowcount or 0}
 
 class ProgramIn(BaseModel):
     kind: str
