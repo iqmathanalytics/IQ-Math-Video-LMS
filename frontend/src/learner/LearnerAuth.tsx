@@ -13,6 +13,10 @@ type Mode = "signin" | "signup" | "forgot" | "reset";
 
 const emailOk = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 const contactOk = (value: string) => value.replace(/\D/g, "").length >= 10;
+const safeNextPath = (value: string | null) => {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/home";
+  return value;
+};
 
 const apiMessage = (data: unknown, fallback: string) => {
   if (!data || typeof data !== "object" || !("detail" in data)) return fallback;
@@ -90,7 +94,7 @@ const LearnerAuth = () => {
         return;
       }
       saveSession(res.data.access_token, res.data.role);
-      navigate("/home");
+      navigate(safeNextPath(searchParams.get("next")));
     } catch (err: unknown) {
       if (!axios.isAxiosError(err) || !err.response) setError("The learner service is not reachable. Check that the API is running, then try again.");
       else if (err.response.status === 401) setError("That email and password do not match an account. Create an account, or check both fields.");
@@ -121,7 +125,8 @@ const LearnerAuth = () => {
         phone_number: form.contact.trim(),
       });
       localStorage.setItem(REMEMBER_KEY, form.email.trim());
-      navigate("/login", { state: { notice: "Account created. Sign in with that email and password." } });
+      const next = searchParams.get("next");
+      navigate(next ? `/login?next=${encodeURIComponent(next)}` : "/login", { state: { notice: "Account created. Sign in with that email and password." } });
     } catch (err: unknown) {
       if (!axios.isAxiosError(err) || !err.response) setError("The learner service is not reachable. Nothing was saved.");
       else setError(apiMessage(err.response.data, "The account could not be created."));

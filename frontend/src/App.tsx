@@ -12,6 +12,7 @@ const SitePages = () => import("./public/SitePages");
 const ContactPage = view(SitePages, (mod) => mod.ContactPage);
 const DesignPage = view(SitePages, (mod) => mod.DesignPage);
 const PricingPage = view(SitePages, (mod) => mod.PricingPage);
+const SharedCourse = view(() => import("./public/SharedCourse"), (mod) => mod.default);
 const DashboardLayout = view(() => import("./DashboardLayout"), (mod) => mod.default);
 const CreateCourse = view(() => import("./CreateCourse"), (mod) => mod.default);
 const CourseBuilder = view(() => import("./CourseBuilder"), (mod) => mod.default);
@@ -58,6 +59,7 @@ function App() {
         <Route path="/pricing" element={hold(<PricingPage />)} />
         <Route path="/contact" element={hold(<ContactPage />)} />
         <Route path="/design" element={hold(<DesignPage />)} />
+        <Route path="/share/courses/:courseId" element={hold(<SharedCourse />)} />
         <Route path="/login" element={hold(<PublicOnlyRoute><LearnerAuth /></PublicOnlyRoute>)} />
         <Route path="/signup" element={hold(<PublicOnlyRoute><LearnerAuth /></PublicOnlyRoute>)} />
         <Route path="/forgot-password" element={hold(<PublicOnlyRoute><LearnerAuth /></PublicOnlyRoute>)} />

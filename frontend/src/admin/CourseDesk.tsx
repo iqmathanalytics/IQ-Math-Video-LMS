@@ -31,6 +31,35 @@ const CourseDesk = () => {
   const [message, setMessage] = useState("");
   const [busyId, setBusyId] = useState(0);
   const [pendingDelete, setPendingDelete] = useState<UploadedCourse | null>(null);
+  const [copiedId, setCopiedId] = useState(0);
+
+  const shareUrl = (courseId: number) => `${window.location.origin}/share/courses/${courseId}`;
+
+  const shareCourse = async (course: UploadedCourse) => {
+    const url = shareUrl(course.id);
+    setMessage("");
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: course.title, text: `View the curriculum for ${course.title}`, url });
+        setMessage(course.is_published ? `Share sheet opened for ${course.title}.` : `Share link ready. Publish ${course.title} so learners can open it.`);
+        return;
+      }
+    } catch {
+      /* fall through to clipboard if the share sheet is cancelled or unavailable */
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedId(course.id);
+      window.setTimeout(() => setCopiedId((current) => (current === course.id ? 0 : current)), 2000);
+      setMessage(
+        course.is_published
+          ? `Share link copied for ${course.title}. Anyone with the link can view the curriculum.`
+          : `Share link copied. Publish ${course.title} so the link opens for learners.`
+      );
+    } catch {
+      setMessage(`Copy this link: ${url}`);
+    }
+  };
 
   const load = () => {
     setStatus("loading");
@@ -117,6 +146,10 @@ const CourseDesk = () => {
             <div className="mt-4 grid grid-cols-2 gap-2">
               <Link to={`/dashboard/course/${course.id}/builder`} className="iq-btn iq-btn-primary w-full">Edit lessons</Link>
               <Link to={`/dashboard/course/${course.id}/recordings`} className="iq-btn iq-btn-line w-full">Recordings</Link>
+              <button type="button" onClick={() => void shareCourse(course)} className="iq-btn iq-btn-line w-full">
+                {copiedId === course.id ? "Link copied" : "Share"}
+              </button>
+              <a href={shareUrl(course.id)} target="_blank" rel="noreferrer" className="iq-btn iq-btn-line w-full text-center">Preview share</a>
               <button type="button" disabled={busyId === course.id} onClick={() => setPublished(course, !course.is_published)} className="iq-btn iq-btn-line w-full">
                 {course.is_published ? "Hide" : "Publish"}
               </button>

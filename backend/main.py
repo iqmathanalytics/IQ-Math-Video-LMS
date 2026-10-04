@@ -1398,6 +1398,50 @@ async def public_courses(response: Response, db: AsyncSession = Depends(get_db))
         rows.append(brief)
     return rows
 
+@app.get("/api/v1/public/courses/{course_id}")
+async def public_course_share(course_id: int, response: Response, db: AsyncSession = Depends(get_db)):
+    """Published course curriculum for share links — titles only, no lesson URLs."""
+    response.headers["Cache-Control"] = "public, max-age=30"
+    result = await db.execute(
+        select(models.Course)
+        .options(selectinload(models.Course.modules).selectinload(models.Module.items))
+        .where(models.Course.id == course_id, models.Course.is_published == True)
+    )
+    course = result.scalars().first()
+    if not course:
+        raise HTTPException(status_code=404, detail="This course is not available to share.")
+    modules = []
+    lesson_total = 0
+    for module in sorted(
+        course.modules or [],
+        key=lambda row: (row.order is None, row.order if row.order is not None else 10**9, row.id),
+    ):
+        lessons = []
+        for item in sorted(
+            module.items or [],
+            key=lambda row: (row.order is None, row.order if row.order is not None else 10**9, row.id),
+        ):
+            lessons.append({
+                "id": item.id,
+                "title": item.title,
+                "type": item.type,
+                "order": item.order,
+                "duration": item.duration,
+            })
+        lesson_total += len(lessons)
+        modules.append({
+            "id": module.id,
+            "title": module.title,
+            "order": module.order,
+            "lessons": lessons,
+        })
+    brief = course_brief(course)
+    brief.pop("instructor_id", None)
+    brief["modules"] = modules
+    brief["module_count"] = len(modules)
+    brief["lesson_count"] = lesson_total
+    return brief
+
 @app.post("/api/v1/courses")
 # 👇 CHANGE: Remove "schemas." prefix to use the local class
 async def create_course(course: CourseCreate, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_instructor)):
