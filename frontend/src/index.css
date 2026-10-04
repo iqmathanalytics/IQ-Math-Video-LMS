@@ -45,7 +45,8 @@ html { scroll-behavior: smooth; }
 }
 .iq-float { animation: iq-float 7s ease-in-out infinite; }
 
-/* Public site follows local time: light 06:00–18:00, dark overnight. */
+/* Theme tokens — driven by data-theme on html / page roots. */
+:root,
 [data-theme="light"] {
   color-scheme: light;
   --iq-bg: #f4f7fb;
