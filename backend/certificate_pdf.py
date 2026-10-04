@@ -38,19 +38,26 @@ def _pil_font(weight: str, size: float) -> ImageFont.FreeTypeFont:
     return ImageFont.truetype(str(_font_path(weight)), size=max(8, size))
 
 
+_DURATION_TAG = re.compile(r"\n*\[Duration:\s*[^\]]+\]", re.I)
+# e.g. leading "13 Hours 41 Mins" — never print course timelines on certificates
+_DURATION_LEAD = re.compile(
+    r"^\s*\d+(?:\.\d+)?\s*(?:hours?|hrs?|h)(?:\s+\d+(?:\.\d+)?\s*(?:minutes?|mins?|m))?\s*[,:\-]?\s*",
+    re.I,
+)
+
+
+def _clean_cert_text(value: str) -> str:
+    text = _DURATION_TAG.sub(" ", value or "")
+    text = _DURATION_LEAD.sub("", text)
+    return re.sub(r"\s+", " ", text).strip(" -:|,")
+
+
 def certificate_body(course_title: str, description: str = "") -> str:
-    """Course title, duration, and description become the paragraph under the name."""
-    raw = description or ""
-    duration = ""
-    match = re.search(r"\[Duration:\s*([^\]]+)\]", raw, re.I)
-    if match:
-        duration = re.sub(r"\s+", " ", match.group(1)).strip()
-        raw = (raw[: match.start()] + raw[match.end() :]).strip()
-    program = re.sub(r"\s+", " ", (course_title or "this program")).strip()
-    if duration and duration.lower() not in program.lower():
-        program = f"{duration} {program}"
+    """Course title and description become the paragraph under the name (no duration/timeline)."""
+    raw = _DURATION_TAG.sub(" ", description or "").strip()
+    program = _clean_cert_text(course_title or "this program") or "this program"
     lead = f"has successfully completed the {program} conducted by IQmath Technologies."
-    detail = re.sub(r"\s+", " ", raw).strip()
+    detail = _clean_cert_text(raw)
     if len(detail) < 30:
         return (
             f"{lead} Throughout this intensive training, the recipient demonstrated "
