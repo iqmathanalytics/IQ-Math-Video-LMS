@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import API_BASE_URL from './config';
-import { Trash2, User, Search, AlertCircle, X, Calendar, CheckCircle, AlertTriangle, RefreshCw, Key } from "lucide-react";
+import { Trash2, User, Search, AlertCircle, X, Calendar, CheckCircle, AlertTriangle, RefreshCw, Key, ChevronDown, ChevronUp } from "lucide-react";
 
 interface Student {
   id: number;
@@ -32,6 +32,7 @@ const StudentManagement = () => {
   const [assignOrganization, setAssignOrganization] = useState("");
   const [assignCourseIds, setAssignCourseIds] = useState<number[]>([]);
   const [assignBusy, setAssignBusy] = useState(false);
+  const [expandedCourses, setExpandedCourses] = useState<Set<number>>(new Set());
 
   const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
   const [resetModal, setResetModal] = useState<{ id: number, name: string } | null>(null);
@@ -131,6 +132,15 @@ const StudentManagement = () => {
     setAssignCourseIds((current) =>
       current.includes(courseId) ? current.filter((id) => id !== courseId) : [...current, courseId]
     );
+  };
+
+  const toggleCourseList = (studentId: number) => {
+    setExpandedCourses((current) => {
+      const next = new Set(current);
+      if (next.has(studentId)) next.delete(studentId);
+      else next.add(studentId);
+      return next;
+    });
   };
 
   const handleAssign = async () => {
@@ -368,13 +378,44 @@ const StudentManagement = () => {
                       </div>
                     </td>
                     <td style={{ padding: "20px" }}>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                        {student.enrolled_courses.length > 0 ? student.enrolled_courses.map((c, i) => (
-                          <span key={i} style={{ fontSize: "11px", background: "var(--iq-inset)", padding: "4px 8px", borderRadius: "4px", color: brand.textMain, border: `1px solid ${brand.border}` }}>
-                            {c}
-                          </span>
-                        )) : <span style={{ fontSize: "12px", color: brand.textLight, fontStyle: "italic" }}>Not enrolled</span>}
-                      </div>
+                      {student.enrolled_courses.length === 0 ? (
+                        <span style={{ fontSize: "12px", color: brand.textLight, fontStyle: "italic" }}>Not enrolled</span>
+                      ) : (
+                        <div>
+                          <button
+                            type="button"
+                            onClick={() => toggleCourseList(student.id)}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "6px",
+                              padding: "6px 10px",
+                              borderRadius: "999px",
+                              border: `1px solid ${brand.border}`,
+                              background: "var(--iq-inset)",
+                              color: brand.textMain,
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              cursor: "pointer",
+                            }}
+                            aria-expanded={expandedCourses.has(student.id)}
+                          >
+                            {expandedCourses.has(student.id) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            {expandedCourses.has(student.id)
+                              ? "Hide courses"
+                              : `${student.enrolled_courses.length} course${student.enrolled_courses.length === 1 ? "" : "s"}`}
+                          </button>
+                          {expandedCourses.has(student.id) && (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "10px" }}>
+                              {student.enrolled_courses.map((c, i) => (
+                                <span key={i} style={{ fontSize: "11px", background: "var(--iq-inset)", padding: "4px 8px", borderRadius: "4px", color: brand.textMain, border: `1px solid ${brand.border}` }}>
+                                  {c}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td style={{ padding: "20px", textAlign: "right" }}>
                       <button
