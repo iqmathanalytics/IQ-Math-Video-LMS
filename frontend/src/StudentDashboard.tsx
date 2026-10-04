@@ -21,6 +21,7 @@ import BrandLogo from "./components/BrandLogo";
 import { CODE_TEMPLATES } from './utils/codeTemplates';
 import { checkoutKey, ensureRazorpay, razorpayPaylink } from './utils/razorpay';
 import { clearSession, getValidSession } from "./utils/session";
+import { courseImageSrc } from "./utils/courseImage";
 
 // --- TYPES ---
 interface Course {
@@ -62,11 +63,6 @@ const StatCard = ({ icon: Icon, label, value }: any) => (
 );
 
 const CourseCard = ({ course, type, navigate, handleFreeEnroll, openEnrollModal, handleDownloadSyllabus, onPayClick }: any) => {
-    const getImageUrl = (url: string) => {
-        if (!url) return "";
-        return url.startsWith('http') ? url : `${API_BASE_URL.replace('/api/v1', '')}/${url}`;
-    };
-
     return (
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:-translate-y-1 hover:shadow-lg transition-all relative group">
 
@@ -79,7 +75,7 @@ const CourseCard = ({ course, type, navigate, handleFreeEnroll, openEnrollModal,
 
             <div className="h-40 bg-slate-200 relative flex items-center justify-center">
                 {course.image_url ? (
-                    <img src={getImageUrl(course.image_url)} alt={course.title} className="w-full h-full object-cover" />
+                    <img src={courseImageSrc(course.image_url)} alt={course.title} className="w-full h-full object-cover" loading="lazy" decoding="async" referrerPolicy="no-referrer" width={480} height={270} />
                 ) : (
                     <BookOpen size={40} className="text-slate-400" />
                 )}
@@ -1052,7 +1048,7 @@ const StudentDashboard = () => {
                                         return (
                                             <div key={course.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-6 items-center">
                                                 <div className="w-full md:w-1/3 h-32 bg-slate-100 rounded-xl overflow-hidden">
-                                                    {course.image_url ? <img src={course.image_url} className="w-full h-full object-cover" /> : <div className="flex items-center justify-center h-full text-slate-300"><BookOpen /></div>}
+                                                    {course.image_url ? <img src={courseImageSrc(course.image_url)} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" referrerPolicy="no-referrer" width={480} height={270} /> : <div className="flex items-center justify-center h-full text-slate-300"><BookOpen /></div>}
                                                 </div>
                                                 <div className="flex-1 w-full">
                                                     <h4 className="font-bold text-lg text-slate-800 mb-2">{course.title}</h4>

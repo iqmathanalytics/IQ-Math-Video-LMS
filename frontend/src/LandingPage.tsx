@@ -337,7 +337,7 @@ const LandingPage = () => {
                   />
                 ) : (
                   <button type="button" onClick={() => setPlaying(true)} className="group relative block w-full" aria-label={`Play ${active.title}`}>
-                    <img src={`https://i.ytimg.com/vi/${active.youtube_id}/hqdefault.jpg`} alt="" className="aspect-video w-full object-cover" />
+                    <img src={`https://i.ytimg.com/vi/${active.youtube_id}/mqdefault.jpg`} alt="" className="aspect-video w-full object-cover" width={320} height={180} loading="lazy" decoding="async" />
                     <span className="absolute inset-0 flex items-center justify-center bg-black/30">
                       <span className="flex h-16 w-16 items-center justify-center rounded-full iq-accent-bg"><Play size={22} aria-hidden="true" /></span>
                     </span>
