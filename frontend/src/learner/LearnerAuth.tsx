@@ -39,6 +39,8 @@ const LearnerAuth = () => {
   const [error, setError] = useState("");
   const [offline, setOffline] = useState(!navigator.onLine);
   const [remember, setRemember] = useState(Boolean(localStorage.getItem(REMEMBER_KEY)));
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [form, setForm] = useState({
     name: "",
     email: localStorage.getItem(REMEMBER_KEY) || "",
@@ -203,10 +205,13 @@ const LearnerAuth = () => {
                   <input className={fieldClass} type="email" autoComplete="username" value={form.email} onChange={(event) => set("email", event.target.value)} />
                 </Field>
                 <Field label="Password" error={errors.password}>
-                  <input className={fieldClass} type="password" autoComplete="current-password" value={form.password} onChange={(event) => set("password", event.target.value)} />
+                  <div className="relative">
+                    <input className={fieldClass} type={showPassword ? "text" : "password"} autoComplete="current-password" value={form.password} onChange={(event) => set("password", event.target.value)} />
+                    <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-xs iq-muted" onClick={() => setShowPassword((value) => !value)}>{showPassword ? "Hide" : "Show"}</button>
+                  </div>
                 </Field>
                 <label className="flex items-center gap-2 text-sm iq-subtle">
-                  <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
+                  <input type="checkbox" className="accent-[var(--iq-accent)]" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
                   Remember this email on this device
                 </label>
                 <SubmitButton busy={busy}>Sign in</SubmitButton>
@@ -232,11 +237,17 @@ const LearnerAuth = () => {
                   <input className={fieldClass} type="tel" value={form.contact} onChange={(event) => set("contact", event.target.value)} autoComplete="tel" placeholder="10-digit mobile number" />
                 </Field>
                 <Field label="Password" error={errors.password}>
-                  <input className={fieldClass} type="password" value={form.password} onChange={(event) => set("password", event.target.value)} autoComplete="new-password" />
+                  <div className="relative">
+                    <input className={fieldClass} type={showPassword ? "text" : "password"} value={form.password} onChange={(event) => set("password", event.target.value)} autoComplete="new-password" />
+                    <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-xs iq-muted" onClick={() => setShowPassword((value) => !value)}>{showPassword ? "Hide" : "Show"}</button>
+                  </div>
                   <PasswordMeter password={form.password} />
                 </Field>
                 <Field label="Confirm password" error={errors.confirm}>
-                  <input className={fieldClass} type="password" value={form.confirm} onChange={(event) => set("confirm", event.target.value)} autoComplete="new-password" />
+                  <div className="relative">
+                    <input className={fieldClass} type={showConfirm ? "text" : "password"} value={form.confirm} onChange={(event) => set("confirm", event.target.value)} autoComplete="new-password" />
+                    <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-xs iq-muted" onClick={() => setShowConfirm((value) => !value)}>{showConfirm ? "Hide" : "Show"}</button>
+                  </div>
                 </Field>
                 <SubmitButton busy={busy}>Create account</SubmitButton>
                 <p className="text-sm iq-muted">Already enrolled? <Link className="iq-link" to="/login">Sign in</Link></p>
@@ -259,11 +270,17 @@ const LearnerAuth = () => {
               <form className="mt-8 space-y-4" onSubmit={resetPassword} noValidate>
                 <h1 className="text-3xl font-semibold" style={{ fontFamily: '"Space Grotesk", Inter, sans-serif' }}>Choose a new password</h1>
                 <Field label="New password" error={errors.password}>
-                  <input className={fieldClass} type="password" value={form.password} onChange={(event) => set("password", event.target.value)} autoComplete="new-password" />
+                  <div className="relative">
+                    <input className={fieldClass} type={showPassword ? "text" : "password"} value={form.password} onChange={(event) => set("password", event.target.value)} autoComplete="new-password" />
+                    <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-xs iq-muted" onClick={() => setShowPassword((value) => !value)}>{showPassword ? "Hide" : "Show"}</button>
+                  </div>
                   <PasswordMeter password={form.password} />
                 </Field>
                 <Field label="Confirm password" error={errors.confirm}>
-                  <input className={fieldClass} type="password" value={form.confirm} onChange={(event) => set("confirm", event.target.value)} autoComplete="new-password" />
+                  <div className="relative">
+                    <input className={fieldClass} type={showConfirm ? "text" : "password"} value={form.confirm} onChange={(event) => set("confirm", event.target.value)} autoComplete="new-password" />
+                    <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-xs iq-muted" onClick={() => setShowConfirm((value) => !value)}>{showConfirm ? "Hide" : "Show"}</button>
+                  </div>
                 </Field>
                 <SubmitButton busy={busy}>Update password</SubmitButton>
               </form>

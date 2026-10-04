@@ -302,7 +302,7 @@ const LandingPage = () => {
                       <p className="text-xs uppercase tracking-[0.14em] iq-faint">{Number(course.price) > 0 ? `₹${course.price}` : "Free"}</p>
                       <h3 className="mt-2 font-semibold">{course.title}</h3>
                       <CourseFacts description={course.description} />
-                      <Link to="/login" className="mt-auto pt-4 inline-block text-sm font-semibold iq-link">Sign in to enrol</Link>
+                      <Link to="/login" className="mt-auto pt-4 inline-block text-sm font-semibold iq-link">Sign in to enroll</Link>
                     </div>
                   </li>
                 ))}

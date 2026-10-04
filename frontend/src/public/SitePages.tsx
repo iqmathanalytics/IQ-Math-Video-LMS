@@ -78,7 +78,7 @@ export const CourseDetailPage = () => {
             <ul className="mt-3 space-y-2 text-sm iq-subtle">{course.outcomes.map((item) => <li key={item}>{item}</li>)}</ul>
           </div>
           <div className="rounded-2xl border iq-line p-5">
-            <h2 className="text-lg font-semibold">Enrol</h2>
+            <h2 className="text-lg font-semibold">Enroll</h2>
             <p className="mt-2 text-sm iq-muted">Sign in with the learner account. Progress, assignments and certificates run in the existing student app.</p>
             <Link to="/login" className="mt-4 inline-flex rounded-full iq-accent-bg px-4 py-2 text-sm font-semibold">Sign in to continue</Link>
           </div>

@@ -78,7 +78,7 @@ export const RecordingLibrary = () => {
         </select>
       </div>
       {status === "loading" && <p className="mt-6 text-sm iq-muted">Loading recordings…</p>}
-      {status === "error" && <p className="mt-6 text-sm iq-muted">Recordings could not be loaded. Enrol in this course to watch them.</p>}
+      {status === "error" && <p className="mt-6 text-sm iq-muted">Recordings could not be loaded. Enroll in this course to watch them.</p>}
       {status === "ready" && rows.length === 0 && <p className="mt-6 rounded-2xl border iq-line p-5 text-sm iq-muted">Recordings will appear here once they are published.</p>}
       <div className="mt-6 space-y-6">
         {sections.map(([section, items]) => (

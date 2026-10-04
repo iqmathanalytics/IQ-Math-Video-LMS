@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
+import { Bell, Trash2, X } from "lucide-react";
 import API_BASE_URL from "../config";
 import BrandLogo from "../components/BrandLogo";
 import { useDayTheme } from "../public/useDayTheme";
@@ -8,6 +9,8 @@ import { clearSession, getValidSession } from "../utils/session";
 import { embedSrcFromLink, youtubeIdFromLink } from "../utils/youtube";
 import CourseFacts from "../components/CourseFacts";
 import CourseCover from "../components/CourseCover";
+
+type Notice = { id: number; title: string; message: string; is_read?: boolean };
 
 type CourseCard = {
   id: string;
@@ -48,18 +51,51 @@ const Shell = () => {
   const theme = useDayTheme();
   const navigate = useNavigate();
   const [offline, setOffline] = useState(!navigator.onLine);
+  const [noticesOpen, setNoticesOpen] = useState(false);
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const [noticesBusy, setNoticesBusy] = useState(false);
+
+  const loadNotices = async () => {
+    const res = await axios.get(`${API_BASE_URL}/notifications`, { headers: authHeaders() });
+    setNotices(Array.isArray(res.data) ? res.data : []);
+  };
 
   useEffect(() => {
     const on = () => setOffline(false);
     const off = () => setOffline(true);
     window.addEventListener("online", on);
     window.addEventListener("offline", off);
+    loadNotices().catch(() => setNotices([]));
+    const timer = window.setInterval(() => { loadNotices().catch(() => undefined); }, 30000);
     return () => {
       window.removeEventListener("online", on);
       window.removeEventListener("offline", off);
+      window.clearInterval(timer);
     };
   }, []);
 
+  const openNotices = async () => {
+    const next = !noticesOpen;
+    setNoticesOpen(next);
+    if (!next) return;
+    setNoticesBusy(true);
+    try {
+      await loadNotices();
+      await axios.patch(`${API_BASE_URL}/notifications/read`, {}, { headers: authHeaders() });
+      setNotices((rows) => rows.map((row) => ({ ...row, is_read: true })));
+    } catch {
+      /* keep the panel open even if mark-read fails */
+    } finally {
+      setNoticesBusy(false);
+    }
+  };
+
+  const removeNotice = async (id: number) => {
+    await axios.delete(`${API_BASE_URL}/notifications/${id}`, { headers: authHeaders() });
+    setNotices((rows) => rows.filter((row) => row.id !== id));
+  };
+
+  const unread = notices.filter((row) => !row.is_read).length;
   const item = "px-3 py-2 rounded-full text-sm iq-subtle";
   const active = "iq-surface iq-accent";
 
@@ -76,7 +112,41 @@ const Shell = () => {
             <NavLink to="/programs" className={({ isActive }) => `${item} ${isActive ? active : ""}`}>Programs</NavLink>
             <NavLink to="/profile" className={({ isActive }) => `${item} ${isActive ? active : ""}`}>Profile</NavLink>
           </nav>
-          <button type="button" className="text-sm iq-muted" onClick={() => { clearSession(); navigate("/login"); }}>Sign out</button>
+          <div className="relative flex items-center gap-3">
+            <button type="button" aria-label="Notifications" className="relative rounded-full border iq-line p-2 iq-muted iq-hover" onClick={() => void openNotices()}>
+              <Bell size={18} />
+              {unread > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full iq-accent-bg px-1 text-[10px] font-bold">{unread > 9 ? "9+" : unread}</span>}
+            </button>
+            <button type="button" className="text-sm iq-muted" onClick={() => { clearSession(); navigate("/login"); }}>Sign out</button>
+            {noticesOpen && (
+              <>
+                <button type="button" aria-label="Close notifications" className="fixed inset-0 z-40 cursor-default bg-transparent" onClick={() => setNoticesOpen(false)} />
+                <div className="absolute right-0 top-12 z-50 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border iq-line iq-surface p-3 shadow-2xl">
+                  <div className="mb-2 flex items-center justify-between gap-2 border-b iq-line pb-2">
+                    <p className="text-sm font-semibold">Notifications</p>
+                    <button type="button" className="iq-btn iq-btn-icon" aria-label="Close" onClick={() => setNoticesOpen(false)}><X size={14} /></button>
+                  </div>
+                  {noticesBusy && notices.length === 0 && <p className="py-6 text-center text-sm iq-muted">Loading…</p>}
+                  {!noticesBusy && notices.length === 0 && <p className="py-6 text-center text-sm iq-muted">No notifications yet.</p>}
+                  <ul className="max-h-80 space-y-2 overflow-y-auto">
+                    {notices.map((notice) => (
+                      <li key={notice.id} className="rounded-xl border iq-line p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold">{notice.title}</p>
+                            <p className="mt-1 text-xs iq-muted">{notice.message}</p>
+                          </div>
+                          <button type="button" className="shrink-0 text-red-500" aria-label="Delete notification" onClick={() => void removeNotice(notice.id)}>
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </header>
       {offline && <p className="mx-auto max-w-6xl px-4 pt-4 text-sm">You are offline. Notes already on this device stay here. Course lists need a connection.</p>}
@@ -85,6 +155,7 @@ const Shell = () => {
         <NavLink to="/home" className={({ isActive }) => `px-2 py-2 ${isActive ? "iq-accent" : "iq-muted"}`}>Home</NavLink>
         <NavLink to="/courses" className={({ isActive }) => `px-2 py-2 ${isActive ? "iq-accent" : "iq-muted"}`}>Courses</NavLink>
         <NavLink to="/my-courses" className={({ isActive }) => `px-2 py-2 ${isActive ? "iq-accent" : "iq-muted"}`}>Learning</NavLink>
+        <button type="button" className={`px-2 py-2 ${noticesOpen ? "iq-accent" : "iq-muted"}`} onClick={() => void openNotices()}>Alerts{unread > 0 ? ` (${unread})` : ""}</button>
         <NavLink to="/profile" className={({ isActive }) => `px-2 py-2 ${isActive ? "iq-accent" : "iq-muted"}`}>Profile</NavLink>
       </nav>
     </div>

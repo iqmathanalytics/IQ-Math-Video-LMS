@@ -31,7 +31,7 @@ const AdminHome = () => {
   const cards = stats
     ? [
         ["Students", stats.students, "/dashboard/students"],
-        ["Enrolments", stats.enrolments, "/dashboard/students"],
+        ["Enrollments", stats.enrolments, "/dashboard/students"],
         ["Courses", stats.courses, "/dashboard/courses"],
         ["Published", stats.published, "/dashboard/courses"],
         ["Watch lessons", stats.watch_lessons, "/dashboard/watch"],

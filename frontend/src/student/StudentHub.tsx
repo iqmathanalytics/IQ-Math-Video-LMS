@@ -97,7 +97,7 @@ export const StudentHome = () => {
                   <p className="mt-1 text-sm iq-muted">{Number(course.price) > 0 ? `₹${course.price}` : "Free"}</p>
                   {enrolledIds.has(course.id)
                     ? <Link to={`/my-courses/${course.id}`} className="mt-3 inline-block text-sm iq-link">Continue</Link>
-                    : <Link to="/courses" className="mt-3 inline-block text-sm iq-link">Enrol</Link>}
+                    : <Link to="/courses" className="mt-3 inline-block text-sm iq-link">Enroll</Link>}
                 </li>
               ))}
             </ul>
@@ -198,7 +198,7 @@ export const CourseCatalog = () => {
   return (
     <div>
       <h1 className="text-3xl font-semibold">Courses</h1>
-      <p className="mt-2 max-w-2xl text-sm iq-muted">Published courses from your school. Enrolment is saved on your account and shows up under My learning.</p>
+      <p className="mt-2 max-w-2xl text-sm iq-muted">Published courses from your school. Enrollment is saved on your account and shows up under My learning.</p>
       <div className="mt-5 flex flex-wrap gap-3">
         <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search courses" className="w-full max-w-sm rounded-xl border iq-line iq-surface px-3 py-3 text-sm" />
         <select value={level} onChange={(event) => setLevel(event.target.value)} className="rounded-xl border iq-line iq-surface px-3 py-3 text-sm" aria-label="Price">
@@ -219,7 +219,7 @@ export const CourseCatalog = () => {
             <h2 className="mt-2 text-xl font-semibold">{course.title}</h2>
             <CourseFacts description={course.description} />
             <div className="mt-4 flex flex-wrap gap-2">
-              {enrolled.has(course.id) ? <Link to={`/my-courses/${course.id}`} className="rounded-full iq-accent-bg px-4 py-2 text-sm font-semibold">Continue</Link> : <button type="button" disabled={busyId === course.id} onClick={() => enroll(course)} className="rounded-full iq-accent-bg px-4 py-2 text-sm font-semibold disabled:opacity-50">{busyId === course.id ? "Opening checkout…" : Number(course.price) > 0 ? `Pay ₹${course.price}` : "Enrol free"}</button>}
+              {enrolled.has(course.id) ? <Link to={`/my-courses/${course.id}`} className="rounded-full iq-accent-bg px-4 py-2 text-sm font-semibold">Continue</Link> : <button type="button" disabled={busyId === course.id} onClick={() => enroll(course)} className="rounded-full iq-accent-bg px-4 py-2 text-sm font-semibold disabled:opacity-50">{busyId === course.id ? "Opening checkout…" : Number(course.price) > 0 ? `Pay ₹${course.price}` : "Enroll free"}</button>}
             </div>
           </li>
         ))}
@@ -263,7 +263,7 @@ export const CertificateGallery = () => {
       <p className="mt-2 max-w-2xl text-sm iq-muted">A certificate is created on this site after you submit the assessments for that course. Download saves the PDF to this device.</p>
       {status === "loading" && <p className="mt-6 text-sm iq-muted">Loading certificates…</p>}
       {status === "error" && <p className="mt-6 text-sm iq-muted">Certificates could not be loaded.</p>}
-      {status === "ready" && earned.length === 0 && locked.length === 0 && <p className="mt-6 rounded-2xl border iq-line p-5 text-sm iq-muted">Enrol in a course first. The certificate unlocks after the assessments are submitted.</p>}
+      {status === "ready" && earned.length === 0 && locked.length === 0 && <p className="mt-6 rounded-2xl border iq-line p-5 text-sm iq-muted">Enroll in a course first. The certificate unlocks after the assessments are submitted.</p>}
       {earned.length > 0 && (
         <ul className="mt-6 grid gap-4 md:grid-cols-2">
           {earned.map((course) => (
