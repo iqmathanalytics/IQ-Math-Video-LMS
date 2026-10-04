@@ -4,6 +4,7 @@ import axios from "axios";
 import { Bell, Trash2, X } from "lucide-react";
 import API_BASE_URL from "../config";
 import BrandLogo from "../components/BrandLogo";
+import ThemeToggle from "../components/ThemeToggle";
 import { useDayTheme } from "../public/useDayTheme";
 import { clearSession, getValidSession } from "../utils/session";
 import { embedSrcFromLink, youtubeIdFromLink } from "../utils/youtube";
@@ -113,6 +114,7 @@ const Shell = () => {
             <NavLink to="/profile" className={({ isActive }) => `${item} ${isActive ? active : ""}`}>Profile</NavLink>
           </nav>
           <div className="relative flex items-center gap-3">
+            <ThemeToggle />
             <button type="button" aria-label="Notifications" className="relative rounded-full border iq-line p-2 iq-muted iq-hover" onClick={() => void openNotices()}>
               <Bell size={18} />
               {unread > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full iq-accent-bg px-1 text-[10px] font-bold">{unread > 9 ? "9+" : unread}</span>}

@@ -4,6 +4,7 @@ import axios from "axios";
 import BrandLogo from "./components/BrandLogo";
 import API_BASE_URL from "./config";
 import { Field, SubmitButton, fieldClass } from "./learner/ui";
+import ThemeToggle from "./components/ThemeToggle";
 import { useDayTheme } from "./public/useDayTheme";
 import { saveSession } from "./utils/session";
 
@@ -76,7 +77,10 @@ const AdminLogin = () => {
       <div className="mx-auto flex min-h-screen max-w-6xl flex-col lg:flex-row">
         <main className="flex flex-1 items-center px-4 py-10">
           <div className="w-full max-w-md">
-            <Link to="/" aria-label="IQNex home"><BrandLogo tone={theme === "dark" ? "onDark" : "ink"} size="sm" /></Link>
+            <div className="flex items-center justify-between gap-3">
+              <Link to="/" aria-label="IQNex home"><BrandLogo tone={theme === "dark" ? "onDark" : "ink"} size="sm" /></Link>
+              <ThemeToggle />
+            </div>
             {offline && <p className="mt-4 rounded-xl border iq-line px-3 py-2 text-sm">You appear to be offline. Sign-in needs a connection.</p>}
             {error && <p className="mt-4 rounded-xl border border-[#b42318] px-3 py-2 text-sm" role="alert">{error}</p>}
             <form className="mt-8 space-y-4" onSubmit={signIn} noValidate>

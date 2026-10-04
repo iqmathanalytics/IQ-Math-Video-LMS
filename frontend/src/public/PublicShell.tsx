@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Menu, Search, X } from "lucide-react";
 import BrandLogo from "../components/BrandLogo";
+import ThemeToggle from "../components/ThemeToggle";
 import { NAV } from "./catalog";
 import { useDayTheme } from "./useDayTheme";
 
@@ -71,6 +72,7 @@ const PublicShell = ({ title, children }: { title?: string; children: ReactNode 
             ))}
           </nav>
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <button aria-label="Search pages" onClick={() => setQueryOpen(true)} className="hidden sm:flex items-center gap-2 rounded-full border iq-line px-3 py-1.5 text-xs iq-subtle">
               <Search size={14} /> Search <span className="iq-faint">Ctrl K</span>
             </button>

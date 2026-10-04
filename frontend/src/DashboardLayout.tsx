@@ -5,6 +5,7 @@ import {
   ChevronRight, Code, Menu, Settings, Users, FolderOpen, MessageSquare, Award, PlayCircle, Search
 } from "lucide-react";
 import BrandLogo from "./components/BrandLogo";
+import ThemeToggle from "./components/ThemeToggle";
 import { useDayTheme } from "./public/useDayTheme";
 import { clearSession } from "./utils/session";
 
@@ -200,6 +201,7 @@ const DashboardLayout = () => {
             <button type="button" onClick={() => setPaletteOpen(true)} className="hidden items-center gap-2 rounded-full border iq-line px-3 py-2 text-sm iq-subtle sm:flex">
               <Search size={16} /> Search <span className="text-xs iq-faint">Ctrl K</span>
             </button>
+            <ThemeToggle />
 
             {/* PROFILE DROPDOWN */}
             <div className="relative">

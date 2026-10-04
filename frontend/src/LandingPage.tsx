@@ -22,6 +22,7 @@ import BrandLogo from "./components/BrandLogo";
 import CourseCover from "./components/CourseCover";
 import CourseFacts from "./components/CourseFacts";
 import { FAQS } from "./public/catalog";
+import ThemeToggle from "./components/ThemeToggle";
 import { useDayTheme } from "./public/useDayTheme";
 import API_BASE_URL from "./config";
 
@@ -159,6 +160,7 @@ const LandingPage = () => {
               : <a key={item.label} href={item.href} className="rounded-lg px-3 py-2 text-sm iq-subtle iq-hover-ink focus-visible:ring-2 focus-visible:ring-[var(--iq-link)]">{item.label}</a>)}
           </nav>
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <Link to="/login" className="hidden rounded-full border iq-line px-4 py-2 text-sm font-semibold sm:inline-flex focus-visible:ring-2 focus-visible:ring-[var(--iq-link)]">Login</Link>
             <Link to="/signup" className="rounded-full iq-accent-bg px-4 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-[var(--iq-link)]">Get Started</Link>
             <button className="rounded-lg p-2 lg:hidden focus-visible:ring-2 focus-visible:ring-[var(--iq-link)]" aria-label="Open menu" aria-expanded={open} onClick={() => setOpen(true)}><Menu size={20} /></button>
