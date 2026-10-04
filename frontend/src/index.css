@@ -94,6 +94,24 @@ html { scroll-behavior: smooth; }
 .iq-page ::-webkit-scrollbar-track { background: var(--iq-bg); }
 .iq-page ::-webkit-scrollbar-thumb { background: var(--iq-faint); }
 
+/* Keep autofilled fields on theme colors (browsers otherwise paint them white). */
+[data-theme="dark"] input:-webkit-autofill,
+[data-theme="dark"] input:-webkit-autofill:hover,
+[data-theme="dark"] input:-webkit-autofill:focus,
+[data-theme="dark"] textarea:-webkit-autofill,
+[data-theme="dark"] select:-webkit-autofill {
+  -webkit-text-fill-color: var(--iq-text);
+  caret-color: var(--iq-text);
+  box-shadow: 0 0 0 1000px var(--iq-surface) inset;
+  transition: background-color 99999s ease-in-out 0s;
+}
+[data-theme="light"] input:-webkit-autofill,
+[data-theme="light"] input:-webkit-autofill:hover,
+[data-theme="light"] input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--iq-text);
+  box-shadow: 0 0 0 1000px var(--iq-surface) inset;
+}
+
 /* Older admin screens use a slate palette. Map those classes onto the site theme. */
 .iq-admin-body { color: var(--iq-text); }
 .iq-admin-body [class*="text-[#1e293b]"],
@@ -110,7 +128,9 @@ html { scroll-behavior: smooth; }
 .iq-admin-body [class*="text-slate-500"],
 .iq-admin-body [class*="text-slate-400"] { color: var(--iq-muted) !important; }
 .iq-admin-body [class*="text-[#005EB8]"],
-.iq-admin-body [class*="text-[#005eb8]"] { color: var(--iq-link) !important; }
+.iq-admin-body [class*="text-[#005eb8]"],
+.iq-admin-body [class*="text-blue-600"],
+.iq-admin-body [class*="text-blue-700"] { color: var(--iq-link) !important; }
 .iq-admin-body [class*="bg-white"],
 .iq-admin-body [class*="bg-slate-50"],
 .iq-admin-body [class*="bg-[#F8FAFC]"],
@@ -122,8 +142,26 @@ html { scroll-behavior: smooth; }
 .iq-admin-body [class*="bg-slate-200"],
 .iq-admin-body [class*="bg-[#E2E8F0]"],
 .iq-admin-body [class*="bg-[#e2e8f0]"],
+.iq-admin-body [class*="bg-[#f1f5f9]"],
+.iq-admin-body [class*="bg-[#F1F5F9]"],
 .iq-admin-body [class*="bg-blue-50"],
-.iq-admin-body [class*="bg-blue-100"] { background-color: var(--iq-inset) !important; }
+.iq-admin-body [class*="bg-blue-100"],
+.iq-admin-body [class*="bg-green-50"],
+.iq-admin-body [class*="bg-green-100"],
+.iq-admin-body [class*="bg-red-50"],
+.iq-admin-body [class*="bg-orange-50"],
+.iq-admin-body [class*="bg-yellow-50"] { background-color: var(--iq-inset) !important; }
+.iq-admin-body [class*="border-blue-500"],
+.iq-admin-body [class*="border-[#10b981]"],
+.iq-admin-body [class*="border-[#87C232]"] { border-color: var(--iq-accent) !important; }
+.iq-admin-body button[class*="bg-[#005EB8]"] span,
+.iq-admin-body button[class*="bg-[#87C232]"],
+.iq-admin-body a[class*="bg-[#005EB8]"] { color: var(--iq-accent-ink) !important; }
+.iq-admin-body [class*="hover:bg-blue-700"]:hover {
+  background-color: var(--iq-accent) !important;
+  color: var(--iq-accent-ink) !important;
+  filter: brightness(0.95);
+}
 .iq-admin-body [class*="border-slate-100"],
 .iq-admin-body [class*="border-slate-200"],
 .iq-admin-body [class*="border-slate-300"],
@@ -134,8 +172,15 @@ html { scroll-behavior: smooth; }
 .iq-admin-body [class*="border-blue-100"],
 .iq-admin-body [class*="border-blue-200"] { border-color: var(--iq-border) !important; }
 .iq-admin-body [class*="bg-[#005EB8]"]:not([class*="text-[#005EB8]"]),
-.iq-admin-body [class*="bg-[#005eb8]"]:not([class*="text-[#005eb8]"]) {
+.iq-admin-body [class*="bg-[#005eb8]"]:not([class*="text-[#005eb8]"]),
+.iq-admin-body [class*="bg-[#87C232]"],
+.iq-admin-body [class*="bg-[#10b981]"] {
   background-color: var(--iq-accent) !important;
+  color: var(--iq-accent-ink) !important;
+}
+.iq-admin-body [class*="text-white"][class*="bg-[#005EB8]"],
+.iq-admin-body [class*="text-white"][class*="bg-[#87C232]"],
+.iq-admin-body [class*="text-white"][class*="bg-[#10b981]"] {
   color: var(--iq-accent-ink) !important;
 }
 .iq-admin-body [class*="bg-[#1e293b]"]:not([class*="/"]),
@@ -162,10 +207,11 @@ html { scroll-behavior: smooth; }
 .iq-admin-body select {
   background-color: var(--iq-surface) !important;
   color: var(--iq-text) !important;
-  border-color: var(--iq-border);
+  border-color: var(--iq-border) !important;
 }
 .iq-admin-body input::placeholder,
 .iq-admin-body textarea::placeholder { color: var(--iq-faint) !important; }
+.iq-admin-body option { background-color: var(--iq-surface); color: var(--iq-text); }
 .iq-surface { background: var(--iq-surface); }
 .iq-inset { background: var(--iq-inset); }
 .iq-header { background: var(--iq-header); }

@@ -93,7 +93,7 @@ const AdminLogin = () => {
                 </div>
               </Field>
               <label className="flex items-center gap-2 text-sm iq-subtle">
-                <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
+                <input type="checkbox" className="accent-[var(--iq-accent)]" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
                 Remember this email on this device
               </label>
               <SubmitButton busy={busy}>Sign in</SubmitButton>

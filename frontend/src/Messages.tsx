@@ -45,9 +45,9 @@ const Messages = () => {
 
     return (
         <div className="p-8 max-w-4xl mx-auto">
-            <h1 className="text-2xl font-bold mb-6 text-slate-800">Broadcast Messages</h1>
+            <h1 className="mb-6 text-2xl font-bold">Broadcast Messages</h1>
             
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
+            <div className="space-y-6 rounded-xl border iq-line iq-surface p-6 shadow-sm">
                 {/* 1. Select Audience */}
                 <div>
                     <label className="block text-sm font-bold text-slate-500 uppercase mb-2">To Whom?</label>
@@ -78,7 +78,7 @@ const Messages = () => {
                     <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={4} className="w-full p-3 border border-slate-200 rounded-lg outline-none focus:border-blue-500" placeholder="Type your announcement here..."></textarea>
                 </div>
 
-                <button onClick={handleSend} className="bg-[#005EB8] text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 hover:bg-blue-700 transition-all"><Send size={18} /> Send Notification</button>
+                <button onClick={handleSend} className="iq-btn iq-btn-primary h-auto rounded-lg px-6 py-3"><Send size={18} /> Send Notification</button>
             </div>
         </div>
     );

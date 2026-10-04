@@ -63,23 +63,23 @@ export const InstructorPrograms = () => {
       <p className="text-sm iq-muted">Events, hackathons, and competitions that signed-in students can register for.</p>
       <form onSubmit={create} className="grid gap-3 rounded-2xl border iq-line p-4 md:grid-cols-2">
         <label className="text-sm">Kind
-          <select value={form.kind} onChange={(event) => setForm({ ...form, kind: event.target.value })} className="mt-1 w-full rounded-xl border iq-line px-3 py-2">
+          <select value={form.kind} onChange={(event) => setForm({ ...form, kind: event.target.value })} className="mt-1 w-full rounded-xl border iq-line iq-surface px-3 py-2">
             <option value="event">event</option>
             <option value="hackathon">hackathon</option>
             <option value="competition">competition</option>
           </select>
         </label>
         <label className="text-sm">Title
-          <input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className="mt-1 w-full rounded-xl border iq-line px-3 py-2" />
+          <input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className="mt-1 w-full rounded-xl border iq-line iq-surface px-3 py-2" />
         </label>
         <label className="text-sm md:col-span-2">Summary
-          <input value={form.summary} onChange={(event) => setForm({ ...form, summary: event.target.value })} className="mt-1 w-full rounded-xl border iq-line px-3 py-2" />
+          <input value={form.summary} onChange={(event) => setForm({ ...form, summary: event.target.value })} className="mt-1 w-full rounded-xl border iq-line iq-surface px-3 py-2" />
         </label>
         <label className="text-sm">Starts
-          <input value={form.starts_on} onChange={(event) => setForm({ ...form, starts_on: event.target.value })} placeholder="2026-10-12" className="mt-1 w-full rounded-xl border iq-line px-3 py-2" />
+          <input value={form.starts_on} onChange={(event) => setForm({ ...form, starts_on: event.target.value })} placeholder="2026-10-12" className="mt-1 w-full rounded-xl border iq-line iq-surface px-3 py-2" />
         </label>
         <label className="text-sm">Mode
-          <input value={form.mode} onChange={(event) => setForm({ ...form, mode: event.target.value })} className="mt-1 w-full rounded-xl border iq-line px-3 py-2" />
+          <input value={form.mode} onChange={(event) => setForm({ ...form, mode: event.target.value })} className="mt-1 w-full rounded-xl border iq-line iq-surface px-3 py-2" />
         </label>
         <button className="rounded-full iq-accent-bg px-4 py-2 text-sm font-semibold md:col-span-2 md:w-fit">Publish program</button>
       </form>
@@ -138,7 +138,7 @@ export const StudentPrograms = () => {
             {!row.registered && <button type="button" onClick={() => register(row.id)} className="mt-3 rounded-full iq-accent-bg px-4 py-2 text-sm font-semibold">Register</button>}
             {row.registered && row.status !== "submitted" && (
               <div className="mt-3 space-y-2">
-                <textarea value={notes[row.id] || ""} onChange={(event) => setNotes({ ...notes, [row.id]: event.target.value })} rows={3} placeholder="Link or note" className="w-full rounded-xl border iq-line px-3 py-2 text-sm" />
+                <textarea value={notes[row.id] || ""} onChange={(event) => setNotes({ ...notes, [row.id]: event.target.value })} rows={3} placeholder="Link or note" className="w-full rounded-xl border iq-line iq-surface px-3 py-2 text-sm" />
                 <button type="button" onClick={() => submit(row.id)} className="rounded-full border iq-line px-4 py-2 text-sm">Submit</button>
               </div>
             )}

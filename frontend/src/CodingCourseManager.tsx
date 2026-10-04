@@ -103,16 +103,16 @@ const CodingCourseManager = () => {
   const filteredChallenges = challenges.filter(c => c.difficulty === activeTab);
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] font-sans relative">
+    <div className="relative min-h-screen font-sans iq-inset">
       {/* 1. Header Area */}
-      <header className="bg-white border-b border-slate-200 px-4 py-3 md:px-8 flex flex-wrap justify-between items-center gap-3 sticky top-0 z-10">
+      <header className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b iq-line iq-surface px-4 py-3 md:px-8">
         <div className="flex items-center gap-4">
             <button onClick={() => navigate(-1)} className="iq-btn iq-btn-icon shrink-0" aria-label="Back">
                 <ArrowLeft size={16} />
             </button>
             <div>
-                <h1 className="text-xl font-extrabold text-slate-900">{courseTitle || "Coding Course"}</h1>
-                <p className="text-xs font-bold text-[#005EB8] uppercase tracking-wide">Manager & Preview</p>
+                <h1 className="text-xl font-extrabold">{courseTitle || "Coding Course"}</h1>
+                <p className="text-xs font-bold uppercase tracking-wide iq-link">Manager & Preview</p>
             </div>
         </div>
         <div className="flex gap-3">

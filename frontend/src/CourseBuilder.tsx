@@ -762,7 +762,7 @@ const CourseBuilder = () => {
                             <textarea rows={5} value={cDesc} onChange={e => setCDesc(e.target.value)} placeholder="Problem Description..." style={{ ...inputStyle, marginBottom: "20px", resize: "vertical" }} />
 
                             {/* Test Cases UI */}
-                            <div style={{ background: "#f8fafc", padding: "15px", borderRadius: "12px", marginBottom: "20px", border: "1px solid #e2e8f0" }}>
+                            <div style={{ background: "var(--iq-inset)", padding: "15px", borderRadius: "12px", marginBottom: "20px", border: "1px solid var(--iq-border)" }}>
                                 <label style={labelStyle}>Test Cases</label>
                                 {cTests.map((tc, i) => (
                                     <div key={i} style={{ display: "flex", gap: "10px", marginBottom: "10px", alignItems: "center" }}>
@@ -785,7 +785,7 @@ const CourseBuilder = () => {
                         </div>
 
                         {/* RIGHT: LIST (With Edit/Delete Features) */}
-                        <div style={{ background: "#f8fafc", padding: "20px", borderRadius: "16px", border: "1px solid #cbd5e1", height: "fit-content", maxHeight: "80vh", overflowY: "auto" }}>
+                        <div style={{ background: "var(--iq-inset)", padding: "20px", borderRadius: "16px", border: "1px solid var(--iq-border)", height: "fit-content", maxHeight: "80vh", overflowY: "auto" }}>
                             <h3 style={{ fontSize: "16px", fontWeight: "800", marginBottom: "15px", color: brand.textMain }}>Problems in {activeTab}</h3>
                             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                                 {challenges.filter(c => c.difficulty === activeTab).map(c => (
@@ -793,7 +793,7 @@ const CourseBuilder = () => {
                                         key={c.id}
                                         onClick={() => handleEditChallenge(c)} // ✅ Click to Edit
                                         style={{
-                                            padding: "14px", background: "var(--iq-surface)", borderRadius: "10px", border: editingId === c.id ? `2px solid ${brand.blue}` : "1px solid #cbd5e1",
+                                            padding: "14px", background: "var(--iq-surface)", borderRadius: "10px", border: editingId === c.id ? `2px solid ${brand.blue}` : `1px solid ${brand.border}`,
                                             fontSize: "14px", fontWeight: "600", color: brand.textMain, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", transition: "all 0.2s"
                                         }}
                                     >
@@ -802,14 +802,14 @@ const CourseBuilder = () => {
                                         </div>
                                         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                                             {/* Edit Indicator */}
-                                            {editingId === c.id && <span style={{ fontSize: "10px", color: brand.blue, fontWeight: "800", background: "#dbeafe", padding: "2px 6px", borderRadius: "4px" }}>EDITING</span>}
+                                            {editingId === c.id && <span style={{ fontSize: "10px", color: brand.blue, fontWeight: "800", background: "var(--iq-hover)", padding: "2px 6px", borderRadius: "4px" }}>EDITING</span>}
 
                                             <Trash2
                                                 size={16}
-                                                color="#cbd5e1"
+                                                color="var(--iq-faint)"
                                                 style={{ cursor: "pointer", transition: "color 0.2s" }}
                                                 onMouseEnter={(e) => (e.currentTarget.style.color = "#ef4444")}
-                                                onMouseLeave={(e) => (e.currentTarget.style.color = "#cbd5e1")}
+                                                onMouseLeave={(e) => (e.currentTarget.style.color = "var(--iq-faint)")}
                                                 onClick={(e) => handleDeleteChallenge(c.id, e)} // ✅ Click to Delete
                                             />
                                         </div>
@@ -953,7 +953,7 @@ const CourseBuilder = () => {
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                         {modules.map((m) => (
-                            <div key={m.id} onClick={() => setSelectedModuleId(m.id)} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px", background: selectedModuleId === m.id ? "#E2E8F0" : "white", borderRadius: "12px", border: selectedModuleId === m.id ? `1.5px solid ${brand.blue}` : `1px solid ${brand.border}`, cursor: "pointer", transition: "all 0.2s ease" }}>
+                            <div key={m.id} onClick={() => setSelectedModuleId(m.id)} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px", background: selectedModuleId === m.id ? "var(--iq-inset)" : "var(--iq-surface)", borderRadius: "12px", border: selectedModuleId === m.id ? `1.5px solid ${brand.blue}` : `1px solid ${brand.border}`, cursor: "pointer", transition: "all 0.2s ease" }}>
                                 <Layout size={18} color={selectedModuleId === m.id ? brand.blue : brand.textLight} />
                                 <span style={{ fontSize: "14px", fontWeight: "600", color: brand.textMain, flex: 1 }}>{m.title}</span>
                                 <button
@@ -978,7 +978,7 @@ const CourseBuilder = () => {
                             </div>
                         ))}
                         {showAddModule ? (
-                            <div style={{ marginTop: "10px", padding: "15px", background: "#f1f5f9", borderRadius: "12px" }}>
+                            <div style={{ marginTop: "10px", padding: "15px", background: "var(--iq-inset)", borderRadius: "12px" }}>
                                 <input autoFocus placeholder="Module Name..." value={newModuleTitle} onChange={(e) => setNewModuleTitle(e.target.value)} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: `1px solid ${brand.border}`, marginBottom: "10px", outline: "none" }} />
                                 <div style={{ display: "flex", gap: "8px" }}>
                                     <button type="button" onClick={handleAddModule} className="iq-btn iq-btn-primary" style={{ flex: 1 }}>Add</button>
@@ -1063,7 +1063,7 @@ const CourseBuilder = () => {
 
                         {libraryMode === "items" ? (
                             <>
-                                <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 1fr auto", gap: "10px", marginBottom: "14px", alignItems: "end", padding: "10px", background: "#f1f5f9", border: `1px solid ${brand.border}`, borderRadius: "12px" }}>
+                                <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 1fr auto", gap: "10px", marginBottom: "14px", alignItems: "end", padding: "10px", background: "var(--iq-inset)", border: `1px solid ${brand.border}`, borderRadius: "12px" }}>
                                     <div style={{ flex: 1 }}>
                                         <label style={{ ...labelStyle, marginBottom: "6px" }}>Search</label>
                                         <div style={{ position: "relative" }}>
@@ -1128,8 +1128,8 @@ const CourseBuilder = () => {
                                                                 width: "100%",
                                                                 textAlign: "left",
                                                                 border: "none",
-                                                                background: libraryType === option.value ? "#eff6ff" : "transparent",
-                                                                color: libraryType === option.value ? "#1d4ed8" : brand.textMain,
+                                                                background: libraryType === option.value ? "var(--iq-hover)" : "transparent",
+                                                                color: libraryType === option.value ? "var(--iq-link)" : brand.textMain,
                                                                 padding: "10px 12px",
                                                                 borderRadius: "8px",
                                                                 cursor: "pointer",
@@ -1197,8 +1197,8 @@ const CourseBuilder = () => {
                                                             width: "100%",
                                                             textAlign: "left",
                                                             border: "none",
-                                                            background: libraryCourseId === "all" ? "#eff6ff" : "transparent",
-                                                            color: libraryCourseId === "all" ? "#1d4ed8" : brand.textMain,
+                                                            background: libraryCourseId === "all" ? "var(--iq-hover)" : "transparent",
+                                                            color: libraryCourseId === "all" ? "var(--iq-link)" : brand.textMain,
                                                             padding: "10px 12px",
                                                             borderRadius: "8px",
                                                             cursor: "pointer",
@@ -1220,8 +1220,8 @@ const CourseBuilder = () => {
                                                                 width: "100%",
                                                                 textAlign: "left",
                                                                 border: "none",
-                                                                background: libraryCourseId === String(course.id) ? "#eff6ff" : "transparent",
-                                                                color: libraryCourseId === String(course.id) ? "#1d4ed8" : brand.textMain,
+                                                                background: libraryCourseId === String(course.id) ? "var(--iq-hover)" : "transparent",
+                                                                color: libraryCourseId === String(course.id) ? "var(--iq-link)" : brand.textMain,
                                                                 padding: "10px 12px",
                                                                 borderRadius: "8px",
                                                                 cursor: "pointer",
@@ -1244,7 +1244,7 @@ const CourseBuilder = () => {
                                             setIsCourseDropdownOpen(false);
                                             fetchLibraryItems();
                                         }}
-                                        style={{ padding: "0 20px", height: "48px", borderRadius: "10px", border: "none", background: brand.blue, color: "white", fontWeight: 700, cursor: "pointer", boxShadow: "0 6px 16px rgba(0,94,184,0.25)" }}
+                                        style={{ padding: "0 20px", height: "48px", borderRadius: "10px", border: "none", background: brand.blue, color: brand.onAccent, fontWeight: 700, cursor: "pointer", boxShadow: "0 6px 16px rgba(0,94,184,0.25)" }}
                                     >
                                         Search
                                     </button>
@@ -1270,7 +1270,7 @@ const CourseBuilder = () => {
                                                     padding: "14px 16px",
                                                     borderBottom: `1px solid ${brand.border}`,
                                                     cursor: "pointer",
-                                                    background: selectedLibraryIds.includes(item.id) ? "#eff6ff" : "white"
+                                                    background: selectedLibraryIds.includes(item.id) ? "var(--iq-hover)" : "var(--iq-surface)"
                                                 }}
                                             >
                                                 <input
@@ -1309,7 +1309,7 @@ const CourseBuilder = () => {
                                             type="button"
                                             onClick={addSelectedFromLibrary}
                                             disabled={libraryAdding}
-                                            style={{ padding: "10px 16px", borderRadius: "10px", border: "none", background: brand.green, color: "white", fontWeight: 800, cursor: "pointer", opacity: libraryAdding ? 0.7 : 1 }}
+                                            style={{ padding: "10px 16px", borderRadius: "10px", border: "none", background: brand.green, color: brand.onAccent, fontWeight: 800, cursor: "pointer", opacity: libraryAdding ? 0.7 : 1 }}
                                         >
                                             {libraryAdding ? "Adding..." : "Add Selected to Module"}
                                         </button>
@@ -1318,7 +1318,7 @@ const CourseBuilder = () => {
                             </>
                         ) : (
                             <>
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "10px", marginBottom: "14px", alignItems: "end", padding: "10px", background: "#f1f5f9", border: `1px solid ${brand.border}`, borderRadius: "12px" }}>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "10px", marginBottom: "14px", alignItems: "end", padding: "10px", background: "var(--iq-inset)", border: `1px solid ${brand.border}`, borderRadius: "12px" }}>
                                     <div ref={sourceCourseDropdownRef} style={{ position: "relative" }}>
                                         <label style={{ ...labelStyle, marginBottom: "6px" }}>Source Course</label>
                                         <div style={{ position: "relative" }}>
@@ -1351,7 +1351,7 @@ const CourseBuilder = () => {
                                                             setIsSourceCourseDropdownOpen(false);
                                                             setSourceModules([]);
                                                         }}
-                                                        style={{ width: "100%", textAlign: "left", border: "none", background: sourceCourseId === "all" ? "#eff6ff" : "transparent", color: sourceCourseId === "all" ? "#1d4ed8" : brand.textMain, padding: "10px 12px", borderRadius: "8px", cursor: "pointer", fontWeight: sourceCourseId === "all" ? 700 : 500, fontSize: "14px" }}
+                                                        style={{ width: "100%", textAlign: "left", border: "none", background: sourceCourseId === "all" ? "var(--iq-hover)" : "transparent", color: sourceCourseId === "all" ? "var(--iq-link)" : brand.textMain, padding: "10px 12px", borderRadius: "8px", cursor: "pointer", fontWeight: sourceCourseId === "all" ? 700 : 500, fontSize: "14px" }}
                                                     >
                                                         Select Source Course
                                                     </button>
@@ -1363,7 +1363,7 @@ const CourseBuilder = () => {
                                                                 setSourceCourseId(String(course.id));
                                                                 setIsSourceCourseDropdownOpen(false);
                                                             }}
-                                                            style={{ width: "100%", textAlign: "left", border: "none", background: sourceCourseId === String(course.id) ? "#eff6ff" : "transparent", color: sourceCourseId === String(course.id) ? "#1d4ed8" : brand.textMain, padding: "10px 12px", borderRadius: "8px", cursor: "pointer", fontWeight: sourceCourseId === String(course.id) ? 700 : 500, fontSize: "14px" }}
+                                                            style={{ width: "100%", textAlign: "left", border: "none", background: sourceCourseId === String(course.id) ? "var(--iq-hover)" : "transparent", color: sourceCourseId === String(course.id) ? "var(--iq-link)" : brand.textMain, padding: "10px 12px", borderRadius: "8px", cursor: "pointer", fontWeight: sourceCourseId === String(course.id) ? 700 : 500, fontSize: "14px" }}
                                                         >
                                                             {course.title}
                                                         </button>
@@ -1376,7 +1376,7 @@ const CourseBuilder = () => {
                                         type="button"
                                         onClick={() => fetchSourceModules()}
                                         disabled={sourceCourseId === "all"}
-                                        style={{ padding: "0 20px", height: "48px", borderRadius: "10px", border: "none", background: brand.blue, color: "white", fontWeight: 700, cursor: sourceCourseId === "all" ? "not-allowed" : "pointer", opacity: sourceCourseId === "all" ? 0.6 : 1 }}
+                                        style={{ padding: "0 20px", height: "48px", borderRadius: "10px", border: "none", background: brand.blue, color: brand.onAccent, fontWeight: 700, cursor: sourceCourseId === "all" ? "not-allowed" : "pointer", opacity: sourceCourseId === "all" ? 0.6 : 1 }}
                                     >
                                         Load Modules
                                     </button>
@@ -1402,7 +1402,7 @@ const CourseBuilder = () => {
                                                     padding: "14px 16px",
                                                     borderBottom: `1px solid ${brand.border}`,
                                                     cursor: "pointer",
-                                                    background: selectedSourceModuleIds.includes(module.id) ? "#eff6ff" : "white"
+                                                    background: selectedSourceModuleIds.includes(module.id) ? "var(--iq-hover)" : "var(--iq-surface)"
                                                 }}
                                             >
                                                 <input
@@ -1435,7 +1435,7 @@ const CourseBuilder = () => {
                                             type="button"
                                             onClick={importSelectedModules}
                                             disabled={modulesImporting}
-                                            style={{ padding: "10px 16px", borderRadius: "10px", border: "none", background: brand.green, color: "white", fontWeight: 800, cursor: "pointer", opacity: modulesImporting ? 0.7 : 1 }}
+                                            style={{ padding: "10px 16px", borderRadius: "10px", border: "none", background: brand.green, color: brand.onAccent, fontWeight: 800, cursor: "pointer", opacity: modulesImporting ? 0.7 : 1 }}
                                         >
                                             {modulesImporting ? "Importing..." : "Import Selected Modules"}
                                         </button>
@@ -1462,7 +1462,7 @@ const CourseBuilder = () => {
                                 {/* ✅ TABS FOR PROBLEMS */}
                                 <div style={{ display: "flex", gap: "10px", borderBottom: `1px solid ${brand.border}`, paddingBottom: "10px" }}>
                                     {problems.map((_, idx) => (
-                                        <div key={idx} onClick={() => setActiveProblemIndex(idx)} style={{ padding: "8px 16px", borderRadius: "8px", background: activeProblemIndex === idx ? brand.blue : "#f1f5f9", color: activeProblemIndex === idx ? "white" : brand.textLight, cursor: "pointer", fontWeight: "700", fontSize: "13px", display: "flex", alignItems: "center", gap: "6px" }}>
+                                        <div key={idx} onClick={() => setActiveProblemIndex(idx)} style={{ padding: "8px 16px", borderRadius: "8px", background: activeProblemIndex === idx ? brand.blue : "var(--iq-inset)", color: activeProblemIndex === idx ? brand.onAccent : brand.textLight, cursor: "pointer", fontWeight: "700", fontSize: "13px", display: "flex", alignItems: "center", gap: "6px" }}>
                                             Problem {idx + 1}
                                             {problems.length > 1 && (<X size={12} onClick={(e) => { e.stopPropagation(); removeProblem(idx); }} />)}
                                         </div>
@@ -1470,7 +1470,7 @@ const CourseBuilder = () => {
                                     {problems.length < 3 && (<button onClick={addProblem} style={{ background: "none", border: `1px dashed ${brand.blue}`, color: brand.blue, borderRadius: "8px", padding: "4px 12px", cursor: "pointer" }}><Plus size={16} /></button>)}
                                 </div>
 
-                                <div style={{ padding: "10px", background: "#f8fafc", borderRadius: "12px", border: `1px solid ${brand.border}` }}>
+                                <div style={{ padding: "10px", background: "var(--iq-inset)", borderRadius: "12px", border: `1px solid ${brand.border}` }}>
                                     <div style={{ marginBottom: "15px" }}><label style={labelStyle}>Problem Title</label><input value={problems[activeProblemIndex].title} onChange={(e) => updateActiveProblem("title", e.target.value)} placeholder="e.g. Reverse a String" style={inputStyle} /></div>
                                     <div style={{ marginBottom: "15px" }}><label style={labelStyle}>Difficulty</label><select value={problems[activeProblemIndex].difficulty} onChange={(e) => updateActiveProblem("difficulty", e.target.value)} style={inputStyle}><option>Easy</option><option>Medium</option><option>Hard</option></select></div>
                                     <div style={{ marginBottom: "15px" }}><label style={labelStyle}>Problem Description</label><textarea rows={4} value={problems[activeProblemIndex].description} onChange={(e) => updateActiveProblem("description", e.target.value)} placeholder="Explain the logic required..." style={{ ...inputStyle, resize: "vertical" }} /></div>
@@ -1681,7 +1681,7 @@ const CourseBuilder = () => {
                     </div>
                 )
             }
-            {toast.show && (<div style={{ position: "fixed", top: "20px", right: "20px", zIndex: 9999, background: "var(--iq-surface)", padding: "16px 24px", borderRadius: "12px", boxShadow: "0 10px 30px -5px rgba(0,0,0,0.15)", borderLeft: `6px solid ${toast.type === "success" ? brand.green : "#ef4444"}`, display: "flex", alignItems: "center", gap: "12px", animation: "slideIn 0.3s ease-out" }}>{toast.type === "success" ? <CheckCircle size={24} color={brand.green} /> : <AlertCircle size={24} color="#ef4444" />}<div><h4 style={{ margin: "0 0 4px 0", fontSize: "14px", fontWeight: "700", color: brand.textMain }}>{toast.type === "success" ? "Success" : "Error"}</h4><p style={{ margin: 0, fontSize: "13px", color: brand.textLight }}>{toast.message}</p></div><button onClick={() => setToast({ ...toast, show: false })} style={{ background: "none", border: "none", cursor: "pointer", marginLeft: "10px" }}><X size={16} color="#94a3b8" /></button><style>{`@keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }`}</style></div>)}
+            {toast.show && (<div style={{ position: "fixed", top: "20px", right: "20px", zIndex: 9999, background: "var(--iq-surface)", padding: "16px 24px", borderRadius: "12px", boxShadow: "0 10px 30px -5px rgba(0,0,0,0.15)", borderLeft: `6px solid ${toast.type === "success" ? brand.green : "#ef4444"}`, display: "flex", alignItems: "center", gap: "12px", animation: "slideIn 0.3s ease-out" }}>{toast.type === "success" ? <CheckCircle size={24} color={brand.green} /> : <AlertCircle size={24} color="#ef4444" />}<div><h4 style={{ margin: "0 0 4px 0", fontSize: "14px", fontWeight: "700", color: brand.textMain }}>{toast.type === "success" ? "Success" : "Error"}</h4><p style={{ margin: 0, fontSize: "13px", color: brand.textLight }}>{toast.message}</p></div><button onClick={() => setToast({ ...toast, show: false })} style={{ background: "none", border: "none", cursor: "pointer", marginLeft: "10px" }}><X size={16} color="var(--iq-faint)" /></button><style>{`@keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }`}</style></div>)}
         </div >
     );
 };

@@ -216,7 +216,7 @@ const CodeArena = () => {
                     <h1 className="text-2xl font-extrabold md:text-3xl">Code Arena</h1>
                     <p className="text-sm iq-muted md:text-base">Create and manage coding challenges.</p>
                 </div>
-                <button onClick={() => setShowModal(true)} className="w-full md:w-auto bg-[#005EB8] hover:bg-[#004a94] text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-200">
+                <button onClick={() => setShowModal(true)} className="iq-btn iq-btn-primary h-auto w-full rounded-xl px-6 py-3 shadow-none md:w-auto">
                     <Plus size={20} /> Create Challenge
                 </button>
             </div>

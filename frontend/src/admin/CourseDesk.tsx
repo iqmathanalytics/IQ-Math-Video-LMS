@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import axios from "axios";
 import API_BASE_URL from "../config";
 import { getValidSession } from "../utils/session";
-import { useDayTheme } from "../public/useDayTheme";
 import CourseCover from "../components/CourseCover";
 
 type UploadedCourse = {
@@ -25,7 +24,6 @@ const headers = () => {
 };
 
 const CourseDesk = () => {
-  const theme = useDayTheme();
   const [courses, setCourses] = useState<UploadedCourse[]>([]);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("All");
@@ -84,7 +82,7 @@ const CourseDesk = () => {
   };
 
   return (
-    <div data-theme={theme} className="iq-page -m-4 min-h-full p-4 lg:-m-10 lg:p-10" style={{ fontFamily: "Inter, sans-serif" }}>
+    <div className="min-h-full" style={{ fontFamily: "Inter, sans-serif" }}>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-[0.16em] iq-faint">Admin</p>

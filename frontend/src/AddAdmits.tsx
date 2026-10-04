@@ -136,7 +136,7 @@ const AddAdmits = () => {
 
       {/* HEADER WITH NEW INSTRUCTOR BUTTON */}
       <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-10">
-        <h1 className="text-2xl md:text-3xl font-extrabold text-[#1e293b] m-0">Add Admits</h1>
+        <h1 className="m-0 text-2xl font-extrabold md:text-3xl">Add Admits</h1>
 
         <button
           onClick={() => setShowInstructorModal(true)}

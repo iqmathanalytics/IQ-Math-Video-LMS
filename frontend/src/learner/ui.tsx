@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 export const fieldClass =
-  "w-full rounded-xl border iq-line iq-surface px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-[var(--iq-accent)]";
+  "w-full rounded-xl border iq-line iq-surface px-3 py-3 text-sm text-[color:var(--iq-text)] outline-none focus:ring-2 focus:ring-[var(--iq-accent)] placeholder:text-[color:var(--iq-faint)]";
 
 export const Field = ({
   label,

@@ -59,8 +59,8 @@ const CreateCourse = () => {
       {/* Header */}
       <div className="flex flex-col-reverse md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
-          <h2 className="text-2xl md:text-3xl font-extrabold text-[#1e293b] mb-2">Create New Course</h2>
-          <p className="text-slate-500 text-sm md:text-base">Set up your course details to begin building your curriculum.</p>
+          <h2 className="mb-2 text-2xl font-extrabold md:text-3xl">Create New Course</h2>
+          <p className="text-sm iq-muted md:text-base">Set up your course details to begin building your curriculum.</p>
         </div>
         <button
           onClick={() => navigate("/dashboard/courses")}
@@ -83,7 +83,7 @@ const CreateCourse = () => {
       )}
 
       {/* Main Form Card */}
-      <div className="bg-[#F8FAFC] p-6 md:p-10 rounded-2xl border border-slate-200 shadow-sm">
+      <div className="rounded-2xl border iq-line iq-surface p-6 shadow-sm md:p-10">
         <form onSubmit={handleSubmit} className="flex flex-col gap-6 md:gap-8">
 
           {/* Select Course Type */}

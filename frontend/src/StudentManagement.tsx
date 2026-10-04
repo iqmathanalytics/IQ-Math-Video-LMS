@@ -220,7 +220,7 @@ const StudentManagement = () => {
         studentToDelete && (
           <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(15, 23, 42, 0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, backdropFilter: "blur(2px)" }}>
             <div style={{ background: "var(--iq-surface)", padding: "30px", borderRadius: "16px", width: "400px", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)", textAlign: "center" }}>
-              <div style={{ width: "50px", height: "50px", background: "#fef2f2", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px auto" }}>
+              <div style={{ width: "50px", height: "50px", background: "rgba(239, 68, 68, 0.12)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px auto" }}>
                 <AlertCircle size={28} color={brand.danger} />
               </div>
               <h3 style={{ margin: "0 0 10px 0", color: brand.textMain, fontSize: "20px", fontWeight: "800" }}>Remove Student?</h3>
@@ -241,7 +241,7 @@ const StudentManagement = () => {
         resetModal && (
           <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(15, 23, 42, 0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, backdropFilter: "blur(2px)" }}>
             <div style={{ background: "var(--iq-surface)", padding: "30px", borderRadius: "16px", width: "400px", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)", textAlign: "center" }}>
-              <div style={{ width: "50px", height: "50px", background: "#f0f9ff", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px auto" }}>
+              <div style={{ width: "50px", height: "50px", background: "var(--iq-inset)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px auto" }}>
                 <Key size={24} color={brand.blue} />
               </div>
               <h3 style={{ margin: "0 0 10px 0", color: brand.textMain, fontSize: "20px", fontWeight: "800" }}>Reset Password</h3>

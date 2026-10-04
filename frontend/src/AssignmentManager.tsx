@@ -82,7 +82,7 @@ const AssignmentManager = () => {
 
   return (
     <div className="p-8 bg-slate-50 min-h-screen font-sans relative">
-      <h1 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+      <h1 className="mb-6 flex items-center gap-2 text-2xl font-bold">
         <FolderOpen className="text-[#005EB8]" /> Assignment Verification
       </h1>
 
