@@ -268,7 +268,8 @@ if not SECRET_KEY or SECRET_KEY == "fallback_secret_change_me_in_prod":
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 60))
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/login") 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/login")
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="api/v1/login", auto_error=False) 
 
 # --- 💳 RAZORPAY ---
 def _razorpay_env(name: str) -> str:
@@ -524,6 +525,22 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
     
     if user is None or user.is_active is False:
         raise HTTPException(status_code=401, detail="User not found")
+    return user
+
+async def get_optional_user(token: Optional[str] = Depends(oauth2_scheme_optional), db: AsyncSession = Depends(get_db)):
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email = payload.get("sub")
+        if not email:
+            return None
+    except JWTError:
+        return None
+    result = await db.execute(select(models.User).where(models.User.email == email))
+    user = result.scalars().first()
+    if user is None or user.is_active is False:
+        return None
     return user
 
 async def require_instructor(current_user: models.User = Depends(get_current_user)):
@@ -1414,9 +1431,18 @@ async def public_courses(response: Response, db: AsyncSession = Depends(get_db))
     return rows
 
 @app.get("/api/v1/public/courses/{course_id}")
-async def public_course_share(course_id: int, response: Response, db: AsyncSession = Depends(get_db)):
-    """Published course curriculum for share links — titles only, no lesson URLs."""
-    response.headers["Cache-Control"] = "public, max-age=30"
+async def public_course_share(
+    course_id: int,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[models.User] = Depends(get_optional_user),
+):
+    """Published course curriculum for share links — titles only, no lesson URLs.
+
+    Guests get a teaser (module 1 + first 2 lessons). Signed-in students get the full outline.
+    """
+    is_student = bool(current_user and current_user.role == "student")
+    response.headers["Cache-Control"] = "private, no-store" if is_student else "public, max-age=30"
     result = await db.execute(
         select(models.Course)
         .options(selectinload(models.Course.modules).selectinload(models.Module.items))
@@ -1425,36 +1451,94 @@ async def public_course_share(course_id: int, response: Response, db: AsyncSessi
     course = result.scalars().first()
     if not course:
         raise HTTPException(status_code=404, detail="This course is not available to share.")
-    modules = []
-    lesson_total = 0
-    for module in sorted(
+
+    sorted_modules = sorted(
         course.modules or [],
         key=lambda row: (row.order is None, row.order if row.order is not None else 10**9, row.id),
-    ):
-        lessons = []
-        for item in sorted(
+    )
+    modules = []
+    lesson_total = 0
+    for module_index, module in enumerate(sorted_modules):
+        sorted_items = sorted(
             module.items or [],
             key=lambda row: (row.order is None, row.order if row.order is not None else 10**9, row.id),
-        ):
-            lessons.append({
-                "id": item.id,
-                "title": item.title,
-                "type": item.type,
-                "order": item.order,
-                "duration": item.duration,
+        )
+        lesson_total += len(sorted_items)
+        if is_student:
+            lessons = [
+                {
+                    "id": item.id,
+                    "title": item.title,
+                    "type": item.type,
+                    "order": item.order,
+                    "duration": item.duration,
+                    "locked": False,
+                }
+                for item in sorted_items
+            ]
+            modules.append({
+                "id": module.id,
+                "title": module.title,
+                "order": module.order,
+                "locked": False,
+                "lessons": lessons,
             })
-        lesson_total += len(lessons)
-        modules.append({
-            "id": module.id,
-            "title": module.title,
-            "order": module.order,
-            "lessons": lessons,
-        })
+            continue
+
+        # Guest teaser: clear module 1 + first 2 lessons; everything else is a locked stub.
+        if module_index == 0:
+            lessons = []
+            for lesson_index, item in enumerate(sorted_items):
+                if lesson_index < 2:
+                    lessons.append({
+                        "id": item.id,
+                        "title": item.title,
+                        "type": item.type,
+                        "order": item.order,
+                        "duration": item.duration,
+                        "locked": False,
+                    })
+                else:
+                    lessons.append({
+                        "id": item.id,
+                        "title": "Locked",
+                        "type": item.type,
+                        "order": item.order,
+                        "duration": None,
+                        "locked": True,
+                    })
+            modules.append({
+                "id": module.id,
+                "title": module.title,
+                "order": module.order,
+                "locked": False,
+                "lessons": lessons,
+            })
+        else:
+            modules.append({
+                "id": module.id,
+                "title": "Locked",
+                "order": module.order,
+                "locked": True,
+                "lessons": [
+                    {
+                        "id": item.id,
+                        "title": "Locked",
+                        "type": item.type,
+                        "order": item.order,
+                        "duration": None,
+                        "locked": True,
+                    }
+                    for item in sorted_items
+                ],
+            })
+
     brief = course_brief(course)
     brief.pop("instructor_id", None)
     brief["modules"] = modules
-    brief["module_count"] = len(modules)
+    brief["module_count"] = len(sorted_modules)
     brief["lesson_count"] = lesson_total
+    brief["preview"] = not is_student
     return brief
 
 @app.post("/api/v1/courses")
