@@ -191,10 +191,15 @@ def create_certificate_pdf(
             pdf.drawString(cursor, y, word)
             cursor += pdf.stringWidth(word, "Baskerville", body_size) + extra
 
+    if credential_id:
+        footer = str(credential_id).strip()
+        pdf.setFillColorRGB(0.45, 0.45, 0.45)
+        pdf.setFont("Baskerville", max(8, 10 * scale))
+        pdf.drawCentredString(page_w / 2, 18 * scale, footer)
+        pdf.setSubject(footer)
+
     pdf.setTitle(f"{course_name} — Certificate")
     pdf.setAuthor("IQmath Technologies")
-    if credential_id:
-        pdf.setSubject(credential_id)
     pdf.showPage()
     pdf.save()
     buffer.seek(0)

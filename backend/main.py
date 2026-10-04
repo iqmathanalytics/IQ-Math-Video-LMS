@@ -27,6 +27,17 @@ import pandas as pd
 import requests 
 import razorpay
 from certificate_pdf import create_certificate_pdf
+from certificate_ids import (
+    DEFAULT_TEMPLATE,
+    TEMPLATE_KEY,
+    SEQ_KEY,
+    ensure_certificate_settings,
+    get_setting,
+    next_certificate_id,
+    preview_certificate_id,
+    set_setting,
+    validate_template,
+)
 import google.generativeai as genai 
 import re  
 import schemas
@@ -103,30 +114,38 @@ async def init_models():
                     await sqlite_add(table, column, definition)
                 except Exception as exc:
                     print(f"SQLite migration note ({table}.{column}): {exc}")
-            return
-        print("Checking for database migrations...")
-        try:
-            # Existing migrations
-            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_number VARCHAR(32);"))
-            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS college VARCHAR(255);"))
-            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS organization VARCHAR(255);"))
-            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS social_media_link VARCHAR(500);"))
-            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;"))
-            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();"))
-            await conn.execute(text("ALTER TABLE notifications ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE;"))
-            
-            # 🆕 FIX FOR YOUR ERROR: Add last_login column
-            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP;"))
-            await conn.execute(text("ALTER TABLE content_items ADD COLUMN IF NOT EXISTS resource_links TEXT;"))
-            await conn.execute(text("ALTER TABLE courses MODIFY description TEXT;"))
-            await conn.execute(text("ALTER TABLE content_items MODIFY content TEXT;"))
-            await conn.execute(text("ALTER TABLE course_assessments ADD COLUMN IF NOT EXISTS file_data LONGBLOB;"))
-            await conn.execute(text("ALTER TABLE submissions ADD COLUMN IF NOT EXISTS file_data LONGBLOB;"))
-            
-            print("Database migrations applied successfully.")
-        except Exception as e:
-            print(f"Migration note: {e}")
+        else:
+            print("Checking for database migrations...")
+            try:
+                # Existing migrations
+                await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_number VARCHAR(32);"))
+                await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS college VARCHAR(255);"))
+                await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS organization VARCHAR(255);"))
+                await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS social_media_link VARCHAR(500);"))
+                await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;"))
+                await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();"))
+                await conn.execute(text("ALTER TABLE notifications ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE;"))
+                
+                # 🆕 FIX FOR YOUR ERROR: Add last_login column
+                await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP;"))
+                await conn.execute(text("ALTER TABLE content_items ADD COLUMN IF NOT EXISTS resource_links TEXT;"))
+                await conn.execute(text("ALTER TABLE courses MODIFY description TEXT;"))
+                await conn.execute(text("ALTER TABLE content_items MODIFY content TEXT;"))
+                await conn.execute(text("ALTER TABLE course_assessments ADD COLUMN IF NOT EXISTS file_data LONGBLOB;"))
+                await conn.execute(text("ALTER TABLE submissions ADD COLUMN IF NOT EXISTS file_data LONGBLOB;"))
+                
+                print("Database migrations applied successfully.")
+            except Exception as e:
+                print(f"Migration note: {e}")
 
+    # Seed certificate ID settings outside the DDL transaction.
+    try:
+        async with AsyncSessionLocal() as session:
+            await ensure_certificate_settings(session)
+    except Exception as e:
+        print(f"Certificate settings seed note: {e}")
+
+    async with engine.begin() as conn:
         # One-time wipe of every notification for all users.
         try:
             await conn.execute(text(
@@ -818,11 +837,11 @@ async def generate_certificate_record(user_id: int, course_id: int, db: AsyncSes
     if cert_check.scalars().first():
         return True # Already exists
 
-    # Create new cert
+    certificate_id = await next_certificate_id(db, user_id, course_id)
     new_cert = models.UserCertificate(
-        user_id=user_id, 
-        course_id=course_id, 
-        certificate_id=f"IQ-LMS-{user_id:04d}{course_id:03d}"
+        user_id=user_id,
+        course_id=course_id,
+        certificate_id=certificate_id,
     )
     db.add(new_cert)
     await db.commit()
@@ -2733,6 +2752,64 @@ async def admin_certificates(db: AsyncSession = Depends(get_db), current_user: m
             "issued_at": issued,
         })
     return rows
+
+
+class CertificateIdSettingsUpdate(BaseModel):
+    template: str
+
+
+@app.get("/api/v1/admin/certificate-id-settings")
+async def get_certificate_id_settings(
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(require_instructor),
+):
+    await ensure_certificate_settings(db)
+    template = await get_setting(db, TEMPLATE_KEY, DEFAULT_TEMPLATE)
+    raw_seq = await get_setting(db, SEQ_KEY, "0")
+    try:
+        current_seq = int(raw_seq or "0")
+    except ValueError:
+        current_seq = 0
+    next_seq = current_seq + 1
+    return {
+        "template": template,
+        "current_seq": current_seq,
+        "next_seq": next_seq,
+        "preview": preview_certificate_id(template, next_seq),
+        "tokens": [
+            "{YYYY}", "{YY}", "{MM}", "{DD}",
+            "{SEQ}", "{SEQ:n}",
+            "{COURSE_ID}", "{USER_ID}",
+        ],
+    }
+
+
+@app.put("/api/v1/admin/certificate-id-settings")
+async def put_certificate_id_settings(
+    body: CertificateIdSettingsUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(require_instructor),
+):
+    try:
+        template = validate_template(body.template)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    await ensure_certificate_settings(db)
+    await set_setting(db, TEMPLATE_KEY, template)
+    await db.commit()
+    raw_seq = await get_setting(db, SEQ_KEY, "0")
+    try:
+        current_seq = int(raw_seq or "0")
+    except ValueError:
+        current_seq = 0
+    next_seq = current_seq + 1
+    return {
+        "template": template,
+        "current_seq": current_seq,
+        "next_seq": next_seq,
+        "preview": preview_certificate_id(template, next_seq),
+        "message": "Certificate ID template saved. Existing certificates keep their IDs.",
+    }
 
 @app.delete("/api/v1/admin/students/{user_id}")
 async def delete_student(user_id: int, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_instructor)):

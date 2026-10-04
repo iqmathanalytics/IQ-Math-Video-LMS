@@ -12,15 +12,47 @@ type Issued = {
   issued_at: string;
 };
 
+type IdSettings = {
+  template: string;
+  current_seq: number;
+  next_seq: number;
+  preview: string;
+};
+
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
 
 type Assessment = { student: string; email: string; file_name: string; link: string; submitted_at: string; course: string };
+
+const previewFromTemplate = (template: string, nextSeq: number) => {
+  const now = new Date();
+  const yyyy = String(now.getFullYear());
+  const yy = yyyy.slice(-2);
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  let out = template
+    .replaceAll("{YYYY}", yyyy)
+    .replaceAll("{YY}", yy)
+    .replaceAll("{MM}", mm)
+    .replaceAll("{DD}", dd)
+    .replaceAll("{COURSE_ID}", "1")
+    .replaceAll("{USER_ID}", "1");
+  out = out.replace(/\{SEQ(?::(\d+))?\}/gi, (_match, width) => {
+    const n = Math.max(1, Math.min(Number(width || 5), 12));
+    return String(nextSeq).padStart(n, "0");
+  });
+  return out.slice(0, 64);
+};
 
 const CertificateDesk = () => {
   const [rows, setRows] = useState<Issued[]>([]);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [template, setTemplate] = useState("IQ-{YYYY}-{SEQ:5}");
+  const [nextSeq, setNextSeq] = useState(1);
+  const [templateBusy, setTemplateBusy] = useState(false);
+  const [templateMsg, setTemplateMsg] = useState("");
+  const [templateErr, setTemplateErr] = useState("");
 
   useEffect(() => {
     axios.get(`${API_BASE_URL}/admin/certificates`, { headers: authHeaders() })
@@ -37,7 +69,18 @@ const CertificateDesk = () => {
         setStatus("ready");
       })
       .catch(() => setStatus("error"));
+
+    axios.get<IdSettings>(`${API_BASE_URL}/admin/certificate-id-settings`, { headers: authHeaders() })
+      .then((res) => {
+        setTemplate(res.data.template || "IQ-{YYYY}-{SEQ:5}");
+        setNextSeq(Number(res.data.next_seq) || 1);
+      })
+      .catch(() => {
+        /* keep defaults; list load still works */
+      });
   }, []);
+
+  const livePreview = useMemo(() => previewFromTemplate(template, nextSeq), [template, nextSeq]);
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -55,6 +98,27 @@ const CertificateDesk = () => {
     link.click();
   };
 
+  const saveTemplate = async () => {
+    setTemplateBusy(true);
+    setTemplateMsg("");
+    setTemplateErr("");
+    try {
+      const res = await axios.put<IdSettings & { message?: string }>(
+        `${API_BASE_URL}/admin/certificate-id-settings`,
+        { template },
+        { headers: authHeaders() },
+      );
+      setTemplate(res.data.template);
+      setNextSeq(Number(res.data.next_seq) || 1);
+      setTemplateMsg(res.data.message || "Template saved.");
+    } catch (err: unknown) {
+      const detail = axios.isAxiosError(err) ? err.response?.data?.detail : null;
+      setTemplateErr(typeof detail === "string" ? detail : "Could not save the template.");
+    } finally {
+      setTemplateBusy(false);
+    }
+  };
+
   return (
     <div>
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -64,6 +128,42 @@ const CertificateDesk = () => {
         </div>
         <button type="button" onClick={exportCsv} disabled={shown.length === 0} className="rounded-full iq-accent-bg px-4 py-2 text-sm font-semibold disabled:opacity-50">Export CSV</button>
       </div>
+
+      <section className="mt-6 rounded-2xl border iq-line iq-surface p-5">
+        <h3 className="text-lg font-semibold">Certificate ID template</h3>
+        <p className="mt-1 text-sm iq-muted">
+          New certificates use this pattern. Existing IDs stay unchanged. Include {"{SEQ}"} or {"{SEQ:n}"} so each ID stays unique.
+        </p>
+        <label className="mt-4 block text-sm">
+          Template
+          <input
+            value={template}
+            onChange={(event) => setTemplate(event.target.value)}
+            className="mt-1 w-full max-w-xl rounded-xl border iq-line iq-surface px-3 py-3 font-mono text-sm"
+            spellCheck={false}
+            maxLength={80}
+          />
+        </label>
+        <p className="mt-2 text-xs iq-muted">
+          Tokens: {"{YYYY}"} {"{YY}"} {"{MM}"} {"{DD}"} {"{SEQ}"} {"{SEQ:n}"} {"{COURSE_ID}"} {"{USER_ID}"}
+        </p>
+        <p className="mt-3 text-sm">
+          Next ID preview: <span className="font-mono text-xs">{livePreview || "—"}</span>
+        </p>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={saveTemplate}
+            disabled={templateBusy || !template.trim()}
+            className="rounded-full iq-accent-bg px-4 py-2 text-sm font-semibold disabled:opacity-50"
+          >
+            {templateBusy ? "Saving…" : "Save template"}
+          </button>
+          {templateMsg && <span className="text-sm iq-muted">{templateMsg}</span>}
+          {templateErr && <span className="text-sm text-red-600">{templateErr}</span>}
+        </div>
+      </section>
+
       <label className="mt-5 block max-w-sm text-sm">Search by student, course, or certificate number
         <input value={query} onChange={(event) => setQuery(event.target.value)} className="mt-1 w-full rounded-xl border iq-line iq-surface px-3 py-3" />
       </label>

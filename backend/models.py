@@ -217,7 +217,14 @@ class UserCertificate(Base):
     pdf_url = Column(String(1000), nullable=True) # Optional if you store PDF file path
 
     user = relationship("User")
-    course = relationship("Course")    
+    course = relationship("Course")
+
+class SiteSetting(Base):
+    """Key/value site configuration (certificate ID template, counters, etc.)."""
+    __tablename__ = "site_settings"
+    key = Column(String(64), primary_key=True)
+    value = Column(Text, nullable=False, default="")
+
 
 class Notification(Base):
     __tablename__ = "notifications"
