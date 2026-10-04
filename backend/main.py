@@ -88,6 +88,9 @@ async def init_models():
                     await conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {definition}"))
             for table, column, definition in (
                 ("users", "phone_number", "phone_number VARCHAR(32)"),
+                ("users", "college", "college VARCHAR(255)"),
+                ("users", "organization", "organization VARCHAR(255)"),
+                ("users", "social_media_link", "social_media_link VARCHAR(500)"),
                 ("users", "is_active", "is_active BOOLEAN DEFAULT 1"),
                 ("users", "created_at", "created_at TIMESTAMP"),
                 ("users", "last_login", "last_login TIMESTAMP"),
@@ -105,6 +108,9 @@ async def init_models():
         try:
             # Existing migrations
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_number VARCHAR(32);"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS college VARCHAR(255);"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS organization VARCHAR(255);"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS social_media_link VARCHAR(500);"))
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;"))
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();"))
             await conn.execute(text("ALTER TABLE notifications ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE;"))
@@ -368,6 +374,19 @@ class PaymentVerifyRequest(BaseModel):
 class PasswordChange(BaseModel):
     new_password: str
     current_password: str
+
+class ProfileUpdate(BaseModel):
+    full_name: Optional[str] = None
+    phone_number: Optional[str] = None
+    college: Optional[str] = None
+    organization: Optional[str] = None
+    social_media_link: Optional[str] = None
+
+class AssignCoursesRequest(BaseModel):
+    course_ids: List[int]
+    emails: Optional[List[str]] = None
+    college: Optional[str] = None
+    organization: Optional[str] = None
 
 class AdminPasswordReset(BaseModel):
     new_password: str
@@ -2332,6 +2351,9 @@ async def account_home(db: AsyncSession = Depends(get_db), current_user: models.
             "full_name": current_user.full_name,
             "email": current_user.email,
             "phone_number": current_user.phone_number,
+            "college": getattr(current_user, "college", None),
+            "organization": getattr(current_user, "organization", None),
+            "social_media_link": getattr(current_user, "social_media_link", None),
         },
         "courses": courses,
         "notices": notices,
@@ -2636,12 +2658,71 @@ async def get_all_students(db: AsyncSession = Depends(get_db), current_user: mod
         real_data.append({ 
             "id": s.id, 
             "full_name": s.full_name, 
-            "email": s.email, 
+            "email": s.email,
+            "phone_number": getattr(s, "phone_number", None),
+            "college": getattr(s, "college", None),
+            "organization": getattr(s, "organization", None),
+            "social_media_link": getattr(s, "social_media_link", None),
             "joined_at": join_date, 
             "enrolled_courses": course_names 
         })
         
     return real_data
+
+@app.post("/api/v1/admin/assign-courses")
+async def assign_courses_by_profile(
+    req: AssignCoursesRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(require_instructor),
+):
+    """Enroll matching students in courses by email list and/or college/organization."""
+    if not req.course_ids:
+        raise HTTPException(status_code=400, detail="Select at least one course.")
+    emails = [str(item).strip().lower() for item in (req.emails or []) if str(item).strip()]
+    college = (req.college or "").strip()
+    organization = (req.organization or "").strip()
+    if not emails and not college and not organization:
+        raise HTTPException(status_code=400, detail="Filter by email, college, or organization.")
+
+    course_res = await db.execute(select(models.Course).where(models.Course.id.in_(req.course_ids)))
+    valid_ids = {course.id for course in course_res.scalars().all()}
+    if not valid_ids:
+        raise HTTPException(status_code=404, detail="No matching courses found.")
+
+    student_res = await db.execute(select(models.User).where(models.User.role == "student", models.User.is_active == True))
+    students = student_res.scalars().all()
+    matched = []
+    for student in students:
+        email = (student.email or "").strip().lower()
+        student_college = (getattr(student, "college", None) or "").strip()
+        student_org = (getattr(student, "organization", None) or "").strip()
+        email_ok = True if not emails else email in emails
+        college_ok = True if not college else student_college.lower() == college.lower()
+        org_ok = True if not organization else student_org.lower() == organization.lower()
+        if email_ok and college_ok and org_ok:
+            matched.append(student)
+
+    if not matched:
+        raise HTTPException(status_code=404, detail="No students matched those filters.")
+
+    enrolled_pairs = 0
+    for student in matched:
+        for course_id in valid_ids:
+            existing = await db.execute(select(models.Enrollment).where(
+                models.Enrollment.user_id == student.id,
+                models.Enrollment.course_id == course_id,
+            ))
+            if existing.scalars().first():
+                continue
+            db.add(models.Enrollment(user_id=student.id, course_id=course_id, enrollment_type="paid"))
+            enrolled_pairs += 1
+    await db.commit()
+    return {
+        "message": f"Assigned {len(valid_ids)} course(s) to {len(matched)} student(s).",
+        "matched_students": len(matched),
+        "new_enrollments": enrolled_pairs,
+        "course_ids": sorted(valid_ids),
+    }
 
 @app.get("/api/v1/admin/overview")
 async def admin_overview(db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_instructor)):
@@ -3431,15 +3512,50 @@ async def submit_program(item_id: int, body: ProgramNote, db: AsyncSession = Dep
     await db.commit()
     return _program_row(item, row)
 
+def _profile_payload(user: models.User) -> dict:
+    return {
+        "id": user.id,
+        "full_name": user.full_name,
+        "email": user.email,
+        "role": user.role,
+        "phone_number": getattr(user, "phone_number", None),
+        "college": getattr(user, "college", None),
+        "organization": getattr(user, "organization", None),
+        "social_media_link": getattr(user, "social_media_link", None),
+    }
+
 @app.get("/api/v1/users/me")
 async def read_users_me(current_user: models.User = Depends(get_current_user)):
-    return {
-        "id": current_user.id,
-        "full_name": current_user.full_name,
-        "email": current_user.email,
-        "role": current_user.role,
-        "phone_number": current_user.phone_number
-    }
+    return _profile_payload(current_user)
+
+@app.patch("/api/v1/users/me")
+async def update_users_me(
+    body: ProfileUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    if body.full_name is not None:
+        name = body.full_name.strip()
+        if len(name) < 2:
+            raise HTTPException(status_code=400, detail="Enter a valid name.")
+        current_user.full_name = name
+    if body.phone_number is not None:
+        phone = re.sub(r"\D", "", body.phone_number or "")
+        if phone and len(phone) < 10:
+            raise HTTPException(status_code=400, detail="Enter a mobile number with at least 10 digits.")
+        current_user.phone_number = phone or None
+    if body.college is not None:
+        current_user.college = body.college.strip() or None
+    if body.organization is not None:
+        current_user.organization = body.organization.strip() or None
+    if body.social_media_link is not None:
+        link = body.social_media_link.strip()
+        if link and not (link.startswith("http://") or link.startswith("https://")):
+            link = f"https://{link}"
+        current_user.social_media_link = link or None
+    await db.commit()
+    await db.refresh(current_user)
+    return _profile_payload(current_user)
 
 @app.post("/api/v1/admin/trigger-backup")
 async def manual_backup(db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_instructor)):

@@ -8,7 +8,10 @@ class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), unique=True, index=True)
-    phone_number = Column(String(32), nullable=True) # <--- ADD THIS LINE
+    phone_number = Column(String(32), nullable=True)
+    college = Column(String(255), nullable=True)
+    organization = Column(String(255), nullable=True)
+    social_media_link = Column(String(500), nullable=True)
     full_name = Column(String(255))
     hashed_password = Column(String(255))
     role = Column(String(32)) 

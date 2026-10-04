@@ -14,7 +14,15 @@ const headers = () => {
 
 type Mine = { id: number; title: string; description: string; has_certificate?: boolean; price?: number; image_url?: string | null; lessons_total?: number; lessons_done?: number };
 type CatalogCourse = { id: number; title: string; description: string; price: number; image_url?: string | null; is_published?: boolean; language?: string | null; course_type?: string };
-type Profile = { id: number; full_name: string; email: string; phone_number?: string | null };
+type Profile = {
+  id: number;
+  full_name: string;
+  email: string;
+  phone_number?: string | null;
+  college?: string | null;
+  organization?: string | null;
+  social_media_link?: string | null;
+};
 
 const downloadCertificate = async (courseId: number, title: string) => {
   const claim = await axios.post(`${API_BASE_URL}/courses/${courseId}/claim-certificate`, {}, { headers: headers() });
@@ -293,11 +301,13 @@ const isFinished = (course: Mine) => {
 export const ProfilePage = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [courses, setCourses] = useState<Mine[]>([]);
+  const [details, setDetails] = useState({ full_name: "", phone_number: "", college: "", organization: "", social_media_link: "" });
   const [currentPassword, setCurrentPassword] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(0);
+  const [savingProfile, setSavingProfile] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -305,9 +315,38 @@ export const ProfilePage = () => {
       axios.get(`${API_BASE_URL}/my-courses`, { headers: headers() }),
     ]).then(([me, mine]) => {
       setProfile(me.data);
+      setDetails({
+        full_name: me.data?.full_name || "",
+        phone_number: me.data?.phone_number || "",
+        college: me.data?.college || "",
+        organization: me.data?.organization || "",
+        social_media_link: me.data?.social_media_link || "",
+      });
       setCourses(Array.isArray(mine.data) ? mine.data : []);
     }).catch(() => setError("Profile could not be loaded."));
   }, []);
+
+  const saveProfile = async (event: FormEvent) => {
+    event.preventDefault();
+    setSavingProfile(true);
+    setMessage("");
+    try {
+      const res = await axios.patch(`${API_BASE_URL}/users/me`, {
+        full_name: details.full_name,
+        phone_number: details.phone_number,
+        college: details.college,
+        organization: details.organization,
+        social_media_link: details.social_media_link,
+      }, { headers: headers() });
+      setProfile(res.data);
+      setMessage("Profile updated.");
+    } catch (err: unknown) {
+      const detail = axios.isAxiosError(err) ? err.response?.data?.detail : "";
+      setMessage(typeof detail === "string" ? detail : "The profile could not be updated.");
+    } finally {
+      setSavingProfile(false);
+    }
+  };
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
@@ -343,16 +382,28 @@ export const ProfilePage = () => {
       <h1 className="text-3xl font-semibold">Profile</h1>
       {error && <p className="mt-4 text-sm iq-muted">{error}</p>}
       {profile && (
-        <div className="mt-6 grid gap-3 sm:grid-cols-2">
-          <div className="rounded-2xl border iq-line p-5">
-            <p className="text-sm iq-muted">User name</p>
-            <p className="mt-1 text-xl font-semibold">{profile.full_name}</p>
-          </div>
-          <div className="rounded-2xl border iq-line p-5">
-            <p className="text-sm iq-muted">Mail</p>
-            <p className="mt-1 text-xl font-semibold break-all">{profile.email}</p>
-          </div>
-        </div>
+        <form onSubmit={saveProfile} className="mt-6 max-w-xl space-y-3 rounded-2xl border iq-line p-5">
+          <h2 className="text-lg font-semibold">Account details</h2>
+          <p className="text-sm iq-muted">Mail stays on the account: <span className="font-medium">{profile.email}</span></p>
+          <label className="block text-sm">Name
+            <input value={details.full_name} onChange={(event) => setDetails((current) => ({ ...current, full_name: event.target.value }))} className="mt-1 w-full rounded-xl border iq-line iq-surface px-3 py-3" autoComplete="name" />
+          </label>
+          <label className="block text-sm">Mobile number
+            <input value={details.phone_number} onChange={(event) => setDetails((current) => ({ ...current, phone_number: event.target.value }))} className="mt-1 w-full rounded-xl border iq-line iq-surface px-3 py-3" autoComplete="tel" placeholder="10-digit mobile number" />
+          </label>
+          <label className="block text-sm">College
+            <input value={details.college} onChange={(event) => setDetails((current) => ({ ...current, college: event.target.value }))} className="mt-1 w-full rounded-xl border iq-line iq-surface px-3 py-3" placeholder="College name" />
+          </label>
+          <label className="block text-sm">Organization
+            <input value={details.organization} onChange={(event) => setDetails((current) => ({ ...current, organization: event.target.value }))} className="mt-1 w-full rounded-xl border iq-line iq-surface px-3 py-3" placeholder="Company or organization" />
+          </label>
+          <label className="block text-sm">Social media link
+            <input value={details.social_media_link} onChange={(event) => setDetails((current) => ({ ...current, social_media_link: event.target.value }))} className="mt-1 w-full rounded-xl border iq-line iq-surface px-3 py-3" placeholder="https://linkedin.com/in/…" />
+          </label>
+          <button type="submit" disabled={savingProfile} className="rounded-full iq-accent-bg px-4 py-3 text-sm font-semibold disabled:opacity-50">
+            {savingProfile ? "Saving…" : "Save profile"}
+          </button>
+        </form>
       )}
       <form onSubmit={save} className="mt-6 max-w-md">
         <h2 className="text-lg font-semibold">Password change</h2>
