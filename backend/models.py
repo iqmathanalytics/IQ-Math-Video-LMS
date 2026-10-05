@@ -324,3 +324,34 @@ class CodeAttempt(Base):
     total = Column(Integer, default=0)
     all_passed = Column(Boolean, default=False)
     updated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class PromoCode(Base):
+    """Admin-created codes that discount paid course checkout."""
+    __tablename__ = "promo_codes"
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String(64), unique=True, index=True, nullable=False)
+    discount_type = Column(String(16), default="percent")  # percent | fixed
+    discount_value = Column(Integer, default=0)  # percent 1-100, or rupees for fixed
+    course_id = Column(Integer, ForeignKey("courses.id"), nullable=True, index=True)  # null = all courses
+    max_uses = Column(Integer, default=0)  # 0 = unlimited
+    used_count = Column(Integer, default=0)
+    is_active = Column(Boolean, default=True)
+    valid_until = Column(DateTime, nullable=True)
+    note = Column(String(255), default="")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    course = relationship("Course")
+
+
+class PromoRedemption(Base):
+    """One successful use of a promo code by a student for a course."""
+    __tablename__ = "promo_redemptions"
+    id = Column(Integer, primary_key=True, index=True)
+    promo_id = Column(Integer, ForeignKey("promo_codes.id"), index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    course_id = Column(Integer, ForeignKey("courses.id"), index=True)
+    original_price = Column(Integer, default=0)
+    final_price = Column(Integer, default=0)
+    order_id = Column(String(128), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)

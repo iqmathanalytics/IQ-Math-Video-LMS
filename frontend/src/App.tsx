@@ -24,6 +24,7 @@ const CodeArena = view(() => import("./CodeArena"), (mod) => mod.default);
 const AdminHome = view(() => import("./admin/AdminHome"), (mod) => mod.default);
 const CourseDesk = view(() => import("./admin/CourseDesk"), (mod) => mod.default);
 const CertificateDesk = view(() => import("./admin/CertificateDesk"), (mod) => mod.default);
+const PromoDesk = view(() => import("./admin/PromoDesk"), (mod) => mod.default);
 const Recordings = () => import("./recordings/Recordings");
 const RecordingAdmin = view(Recordings, (mod) => mod.RecordingAdmin);
 const RecordingLibrary = view(Recordings, (mod) => mod.RecordingLibrary);
@@ -70,6 +71,7 @@ function App() {
           <Route index element={hold(<AdminHome />)} />
           <Route path="courses" element={hold(<CourseDesk />)} />
           <Route path="certificates" element={hold(<CertificateDesk />)} />
+          <Route path="promo-codes" element={hold(<PromoDesk />)} />
           <Route path="watch" element={hold(<WatchManager />)} />
           <Route path="create-course" element={hold(<CreateCourse />)} />
           <Route path="course/:courseId/builder" element={hold(<CourseBuilder />)} />

@@ -124,6 +124,11 @@ export const CourseCatalog = () => {
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [message, setMessage] = useState("");
   const [busyId, setBusyId] = useState(0);
+  const [checkout, setCheckout] = useState<CatalogCourse | null>(null);
+  const [promoCode, setPromoCode] = useState("");
+  const [promoMsg, setPromoMsg] = useState("");
+  const [finalPrice, setFinalPrice] = useState<number | null>(null);
+  const [promoBusy, setPromoBusy] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -156,9 +161,42 @@ export const CourseCatalog = () => {
   const markEnrolled = (course: CatalogCourse) => {
     setEnrolled((current) => new Set(current).add(course.id));
     setMessage(`You are enrolled in ${course.title}. Open it from My learning.`);
+    setCheckout(null);
+    setPromoCode("");
+    setPromoMsg("");
+    setFinalPrice(null);
   };
 
-  const enroll = async (course: CatalogCourse) => {
+  const openCheckout = (course: CatalogCourse) => {
+    setMessage("");
+    setCheckout(course);
+    setPromoCode("");
+    setPromoMsg("");
+    setFinalPrice(Number(course.price) || 0);
+  };
+
+  const applyPromo = async () => {
+    if (!checkout) return;
+    setPromoBusy(true);
+    setPromoMsg("");
+    try {
+      const res = await axios.post(
+        `${API_BASE_URL}/promo/validate`,
+        { code: promoCode.trim(), course_id: checkout.id },
+        { headers: headers() },
+      );
+      setFinalPrice(Number(res.data.final_price));
+      setPromoMsg(res.data.message || "Promo applied.");
+    } catch (err: unknown) {
+      setFinalPrice(Number(checkout.price) || 0);
+      const detail = axios.isAxiosError(err) ? err.response?.data?.detail : "";
+      setPromoMsg(typeof detail === "string" && detail ? detail : "That promo code could not be applied.");
+    } finally {
+      setPromoBusy(false);
+    }
+  };
+
+  const enroll = async (course: CatalogCourse, code = "") => {
     setMessage("");
     setBusyId(course.id);
     try {
@@ -167,7 +205,16 @@ export const CourseCatalog = () => {
         markEnrolled(course);
         return;
       }
-      const order = await axios.post(`${API_BASE_URL}/create-order`, { course_id: course.id }, { headers: headers() });
+      const order = await axios.post(
+        `${API_BASE_URL}/create-order`,
+        { course_id: course.id, promo_code: code.trim() || undefined },
+        { headers: headers() },
+      );
+      if (order.data?.free) {
+        markEnrolled(course);
+        setMessage(order.data.message || "Promo unlocked this course.");
+        return;
+      }
       const razorpayKey = checkoutKey(order.data?.key_id);
       if (!razorpayKey || !order.data?.id) {
         setMessage("Razorpay checkout is not available right now.");
@@ -175,7 +222,7 @@ export const CourseCatalog = () => {
       }
       await ensureRazorpay();
       const RazorpayCheckout = (window as unknown as { Razorpay: new (options: object) => { open: () => void } }).Razorpay;
-      const checkout = new RazorpayCheckout(withPaymentMethods({
+      const pay = new RazorpayCheckout(withPaymentMethods({
         key: razorpayKey,
         amount: order.data.amount,
         currency: order.data.currency || "INR",
@@ -189,12 +236,13 @@ export const CourseCatalog = () => {
             razorpay_payment_id: response.razorpay_payment_id,
             razorpay_order_id: response.razorpay_order_id,
             razorpay_signature: response.razorpay_signature,
+            promo_code: code.trim() || undefined,
           }, { headers: headers() });
           markEnrolled(course);
         },
       }));
-      checkout.open();
-      setMessage(`Razorpay checkout is open for ${course.title}.`);
+      pay.open();
+      setMessage(`Razorpay checkout is open for ${course.title}${order.data?.final_price != null ? ` · ₹${order.data.final_price}` : ""}.`);
     } catch (err: unknown) {
       const detail = axios.isAxiosError(err) ? err.response?.data?.detail : "";
       setMessage(typeof detail === "string" && detail ? detail : "Checkout did not start. Try again.");
@@ -238,13 +286,52 @@ export const CourseCatalog = () => {
               <h2 className="mt-2 text-xl font-semibold">{course.title}</h2>
               <CourseFacts description={course.description} />
               <div className="mt-4 flex flex-wrap gap-2">
-                {enrolled.has(course.id) ? <Link to={`/my-courses/${course.id}`} className="rounded-full iq-accent-bg px-4 py-2 text-sm font-semibold">Continue</Link> : <button type="button" disabled={busyId === course.id} onClick={() => enroll(course)} className="rounded-full iq-accent-bg px-4 py-2 text-sm font-semibold disabled:opacity-50">{busyId === course.id ? "Opening checkout…" : Number(course.price) > 0 ? `Pay ₹${course.price}` : "Enroll free"}</button>}
+                {enrolled.has(course.id) ? <Link to={`/my-courses/${course.id}`} className="rounded-full iq-accent-bg px-4 py-2 text-sm font-semibold">Continue</Link> : <button type="button" disabled={busyId === course.id} onClick={() => Number(course.price) > 0 ? openCheckout(course) : void enroll(course)} className="rounded-full iq-accent-bg px-4 py-2 text-sm font-semibold disabled:opacity-50">{busyId === course.id ? "Opening checkout…" : Number(course.price) > 0 ? `Pay ₹${course.price}` : "Enroll free"}</button>}
               </div>
             </li>
           );
         })}
       </ul>
       {message && <p className="mt-4 text-sm iq-muted">{message}</p>}
+
+      {checkout && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setCheckout(null)}>
+          <div className="w-full max-w-md rounded-2xl border iq-line iq-surface p-5" onClick={(event) => event.stopPropagation()}>
+            <h3 className="text-xl font-semibold">Checkout</h3>
+            <p className="mt-1 text-sm iq-muted">Unlock <strong>{checkout.title}</strong>.</p>
+            <div className="mt-4 rounded-xl border iq-line p-3 text-sm">
+              <div className="flex justify-between"><span className="iq-muted">Course price</span><span>₹{checkout.price}</span></div>
+              <div className="mt-2 flex justify-between font-semibold"><span>You pay</span><span className="iq-accent">₹{finalPrice ?? checkout.price}</span></div>
+            </div>
+            <label className="mt-4 block text-sm">
+              <span className="iq-muted">Promo code</span>
+              <div className="mt-1 flex gap-2">
+                <input
+                  value={promoCode}
+                  onChange={(event) => setPromoCode(event.target.value.toUpperCase())}
+                  placeholder="WELCOME20"
+                  className="min-w-0 flex-1 rounded-xl border iq-line iq-surface px-3 py-2"
+                />
+                <button type="button" disabled={promoBusy || !promoCode.trim()} onClick={() => void applyPromo()} className="rounded-xl border iq-line px-3 py-2 text-sm disabled:opacity-50">
+                  {promoBusy ? "…" : "Apply"}
+                </button>
+              </div>
+            </label>
+            {promoMsg && <p className="mt-2 text-sm iq-muted">{promoMsg}</p>}
+            <div className="mt-5 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={busyId === checkout.id}
+                onClick={() => void enroll(checkout, promoCode)}
+                className="rounded-full iq-accent-bg px-4 py-2 text-sm font-semibold disabled:opacity-50"
+              >
+                {busyId === checkout.id ? "Processing…" : (finalPrice ?? checkout.price) <= 0 ? "Unlock free with promo" : `Pay ₹${finalPrice ?? checkout.price}`}
+              </button>
+              <button type="button" onClick={() => setCheckout(null)} className="rounded-full border iq-line px-4 py-2 text-sm">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

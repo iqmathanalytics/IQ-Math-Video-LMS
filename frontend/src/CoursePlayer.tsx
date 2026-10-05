@@ -965,6 +965,7 @@ const CoursePlayer = () => {
     };
 
     const [toast, setToast] = useState({ show: false, message: "", type: "success" });
+    const [promoCode, setPromoCode] = useState("");
     const triggerToast = (message: string, type: "success" | "error" = "success") => {
         setToast({ show: true, message, type });
         setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000);
@@ -992,9 +993,14 @@ const CoursePlayer = () => {
             // ✅ 2. Create order for this exact course (amount comes from backend)
             const { data } = await axios.post(
                 orderUrl,
-                { course_id: Number(courseId) },
+                { course_id: Number(courseId), promo_code: promoCode.trim() || undefined },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
+            if (data?.free) {
+                triggerToast(data.message || "Promo unlocked this course.", "success");
+                setTimeout(() => window.location.reload(), 1200);
+                return;
+            }
             const razorpayKey = checkoutKey(data?.key_id);
             if (!razorpayKey || !data?.id) {
                 triggerToast("Razorpay checkout is not available right now.", "error");
@@ -1016,7 +1022,8 @@ const CoursePlayer = () => {
                                 course_id: Number(courseId),
                                 razorpay_payment_id: response.razorpay_payment_id,
                                 razorpay_order_id: response.razorpay_order_id,
-                                razorpay_signature: response.razorpay_signature
+                                razorpay_signature: response.razorpay_signature,
+                                promo_code: promoCode.trim() || undefined,
                             },
                             { headers: { Authorization: `Bearer ${token}` } }
                         );
@@ -1356,13 +1363,19 @@ const CoursePlayer = () => {
                         Unlock lifetime access to continue learning.
                     </p>
 
-                    <div className="bg-slate-50 rounded-xl p-4 mb-6 border border-slate-100">
+                    <div className="bg-slate-50 rounded-xl p-4 mb-4 border border-slate-100">
                         <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Total Price</p>
                         {/* ✅ DYNAMIC PRICE */}
                         <p className="text-3xl font-extrabold text-slate-900">
                             ₹{displayPrice} <span className="text-lg font-medium text-slate-400 line-through">₹{originalPrice}</span>
                         </p>
                     </div>
+                    <input
+                        value={promoCode}
+                        onChange={(event) => setPromoCode(event.target.value.toUpperCase())}
+                        placeholder="Promo code"
+                        className="mb-4 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold tracking-wide"
+                    />
 
                     <button
                         onClick={handlePayment}
@@ -1401,7 +1414,17 @@ const CoursePlayer = () => {
                     </div>
                     <div className="flex items-center gap-2 lg:gap-4">
                         {localStorage.getItem("role") === "instructor" && (<button onClick={handleEditClick} className="hidden lg:flex items-center gap-2 bg-slate-100 text-slate-700 px-3 py-2 rounded-lg font-bold border border-slate-200 hover:bg-slate-200 transition-colors text-sm"><Edit size={16} /> Edit Course</button>)}
-                        {Number(course?.price) > 0 && course?.enrollment_type !== "paid" && <button onClick={handlePayment} className="hidden sm:flex items-center gap-2 bg-[#87C232] text-white px-4 py-2 rounded-lg font-bold border-none cursor-pointer hover:bg-[#76a82b] transition-colors text-xs lg:text-sm"><CreditCard size={18} /> Buy access</button>}
+                        {Number(course?.price) > 0 && course?.enrollment_type !== "paid" && (
+                            <div className="hidden sm:flex items-center gap-2">
+                                <input
+                                    value={promoCode}
+                                    onChange={(event) => setPromoCode(event.target.value.toUpperCase())}
+                                    placeholder="Promo"
+                                    className="w-28 rounded-lg border border-slate-200 px-2 py-1.5 text-xs font-semibold tracking-wide"
+                                />
+                                <button onClick={handlePayment} className="flex items-center gap-2 bg-[#87C232] text-white px-4 py-2 rounded-lg font-bold border-none cursor-pointer hover:bg-[#76a82b] transition-colors text-xs lg:text-sm"><CreditCard size={18} /> Buy access</button>
+                            </div>
+                        )}
                         <button onClick={() => setNotesOpen((open) => !open)} className="flex items-center gap-2 rounded-lg border iq-line iq-surface px-3 py-2 text-xs font-bold lg:text-sm" style={{ color: "var(--iq-text)" }}>{notesOpen ? "Hide notes" : "Notes"}</button>
                         <button onClick={() => setSidebarOpen(!sidebarOpen)} className="bg-none border-none cursor-pointer p-2 hover:bg-slate-100 rounded-lg"><Menu color={brand.textMain} size={24} /></button>
                     </div>

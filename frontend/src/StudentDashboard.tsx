@@ -178,6 +178,9 @@ const StudentDashboard = () => {
     // Modal & Settings
     const [showModal, setShowModal] = useState(false);
     const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+    const [promoCode, setPromoCode] = useState("");
+    const [promoMsg, setPromoMsg] = useState("");
+    const [finalPrice, setFinalPrice] = useState<number | null>(null);
     const [processing, setProcessing] = useState(false);
     const [toast, setToast] = useState<{ show: boolean; message: string; type: "success" | "error" }>({
         show: false, message: "", type: "success"
@@ -707,9 +710,14 @@ const StudentDashboard = () => {
             } else {
                 const token = localStorage.getItem("token");
                 const orderRes = await axios.post(`${API_BASE_URL}/create-order`,
-                    { course_id: selectedCourse.id },
+                    { course_id: selectedCourse.id, promo_code: promoCode.trim() || undefined },
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
+                if (orderRes.data?.free) {
+                    triggerToast(orderRes.data.message || "Promo unlocked this course.", "success");
+                    fetchData(); setShowModal(false); setActiveTab("learning");
+                    return;
+                }
                 const razorpayKey = checkoutKey(orderRes.data?.key_id);
                 if (!razorpayKey || !orderRes.data?.id) {
                     triggerToast("Razorpay checkout is not available right now.", "error");
@@ -731,7 +739,8 @@ const StudentDashboard = () => {
                                 course_id: selectedCourse.id,
                                 razorpay_payment_id: response.razorpay_payment_id,
                                 razorpay_order_id: response.razorpay_order_id,
-                                razorpay_signature: response.razorpay_signature
+                                razorpay_signature: response.razorpay_signature,
+                                promo_code: promoCode.trim() || undefined,
                             },
                             { headers: { Authorization: `Bearer ${token}` } }
                         );
@@ -783,7 +792,29 @@ const StudentDashboard = () => {
         window.open(url, '_blank');
     };
 
-    const openEnrollModal = (course: Course) => { setSelectedCourse(course); setShowModal(true); };
+    const openEnrollModal = (course: Course) => {
+        setSelectedCourse(course);
+        setPromoCode("");
+        setPromoMsg("");
+        setFinalPrice(Number(course.price) || 0);
+        setShowModal(true);
+    };
+
+    const applyPromoCode = async () => {
+        if (!selectedCourse || !promoCode.trim()) return;
+        try {
+            const res = await axios.post(
+                `${API_BASE_URL}/promo/validate`,
+                { code: promoCode.trim(), course_id: selectedCourse.id },
+                { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } },
+            );
+            setFinalPrice(Number(res.data.final_price));
+            setPromoMsg(res.data.message || "Promo applied.");
+        } catch (err: any) {
+            setFinalPrice(Number(selectedCourse.price) || 0);
+            setPromoMsg(getErrorMessage(err, "That promo code could not be applied."));
+        }
+    };
     const handleLogout = () => { clearSession(); navigate("/"); };
 
     // --- ⚔️ THE REAL CODE ARENA VIEW ---
@@ -1207,14 +1238,30 @@ const StudentDashboard = () => {
                         </div>
 
                         <div className="p-6">
-                            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-6 flex items-center justify-between">
-                                <div><span className="block text-[10px] font-bold text-slate-400 uppercase">Price</span><span className="text-2xl font-extrabold text-[#005EB8]">₹{selectedCourse.price}</span></div>
+                            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-4 flex items-center justify-between">
+                                <div>
+                                    <span className="block text-[10px] font-bold text-slate-400 uppercase">Price</span>
+                                    <span className="text-2xl font-extrabold text-[#005EB8]">₹{finalPrice ?? selectedCourse.price}</span>
+                                    {finalPrice != null && finalPrice < Number(selectedCourse.price) && (
+                                        <span className="ml-2 text-sm text-slate-400 line-through">₹{selectedCourse.price}</span>
+                                    )}
+                                </div>
                                 <div className="text-right"><span className="block text-[10px] font-bold text-slate-400 uppercase">Access</span><span className="text-sm font-bold text-slate-700">Lifetime</span></div>
                             </div>
+                            <div className="mb-6 flex gap-2">
+                                <input
+                                    value={promoCode}
+                                    onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                                    placeholder="Promo code"
+                                    className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold tracking-wide"
+                                />
+                                <button type="button" onClick={() => void applyPromoCode()} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">Apply</button>
+                            </div>
+                            {promoMsg && <p className="mb-4 text-xs text-slate-500">{promoMsg}</p>}
 
                             <div className="flex flex-col gap-3">
                                 <button onClick={() => handleEnrollStrategy("paid")} disabled={processing} className="w-full py-3 rounded-lg bg-[#005EB8] hover:bg-blue-700 text-white font-bold shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2">
-                                    {processing ? "Processing..." : <><Lock size={16} /> Pay & Unlock Now</>}
+                                    {processing ? "Processing..." : <><Lock size={16} /> {(finalPrice ?? selectedCourse.price) <= 0 ? "Unlock with promo" : `Pay ₹${finalPrice ?? selectedCourse.price}`}</>}
                                 </button>
                                 {RAZORPAY_PAYLINK_URL && (
                                     <button

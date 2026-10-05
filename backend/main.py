@@ -356,12 +356,28 @@ class EnrollmentRequest(BaseModel):
 
 class CreateOrderRequest(BaseModel):
     course_id: int
+    promo_code: Optional[str] = None
 
 class PaymentVerifyRequest(BaseModel):
     course_id: int
     razorpay_payment_id: str
     razorpay_order_id: str
     razorpay_signature: str
+    promo_code: Optional[str] = None
+
+class PromoCodeIn(BaseModel):
+    code: str
+    discount_type: str = "percent"  # percent | fixed
+    discount_value: int
+    course_id: Optional[int] = None
+    max_uses: int = 0
+    is_active: bool = True
+    valid_until: Optional[str] = None  # YYYY-MM-DD
+    note: str = ""
+
+class PromoValidateIn(BaseModel):
+    code: str
+    course_id: int
 
 class PasswordChange(BaseModel):
     new_password: str
@@ -2401,45 +2417,316 @@ async def update_content(content_id: int, update: ContentUpdate, db: AsyncSessio
         return {"message": "Updated"}
     raise HTTPException(status_code=404)
 
+def _normalize_promo_code(value: str | None) -> str:
+    return re.sub(r"\s+", "", (value or "")).upper()
+
+
+def _promo_final_price(original: int, promo: models.PromoCode) -> int:
+    original = max(0, int(original or 0))
+    value = max(0, int(promo.discount_value or 0))
+    if (promo.discount_type or "percent").lower() == "fixed":
+        return max(0, original - value)
+    percent = min(100, value)
+    off = int(round(original * percent / 100.0))
+    return max(0, original - off)
+
+
+async def _load_usable_promo(
+    db: AsyncSession,
+    code: str | None,
+    course_id: int,
+    user_id: int,
+    *,
+    require_code: bool = False,
+) -> models.PromoCode | None:
+    normalized = _normalize_promo_code(code)
+    if not normalized:
+        if require_code:
+            raise HTTPException(status_code=400, detail="Enter a promo code.")
+        return None
+    res = await db.execute(select(models.PromoCode).where(models.PromoCode.code == normalized))
+    promo = res.scalars().first()
+    if not promo or not promo.is_active:
+        raise HTTPException(status_code=400, detail="That promo code is not valid.")
+    if promo.valid_until and promo.valid_until < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="That promo code has expired.")
+    if promo.max_uses and int(promo.used_count or 0) >= int(promo.max_uses):
+        raise HTTPException(status_code=400, detail="That promo code has reached its use limit.")
+    if promo.course_id and int(promo.course_id) != int(course_id):
+        raise HTTPException(status_code=400, detail="That promo code does not apply to this course.")
+    used = await db.execute(
+        select(models.PromoRedemption).where(
+            models.PromoRedemption.promo_id == promo.id,
+            models.PromoRedemption.user_id == user_id,
+            models.PromoRedemption.course_id == course_id,
+        )
+    )
+    if used.scalars().first():
+        raise HTTPException(status_code=400, detail="You already used this promo code on this course.")
+    return promo
+
+
+async def _record_promo_redemption(
+    db: AsyncSession,
+    promo: models.PromoCode,
+    user_id: int,
+    course_id: int,
+    original_price: int,
+    final_price: int,
+    order_id: str | None,
+):
+    db.add(
+        models.PromoRedemption(
+            promo_id=promo.id,
+            user_id=user_id,
+            course_id=course_id,
+            original_price=original_price,
+            final_price=final_price,
+            order_id=order_id,
+        )
+    )
+    promo.used_count = int(promo.used_count or 0) + 1
+
+
+def _promo_payload(promo: models.PromoCode, course_title: str | None = None) -> dict:
+    return {
+        "id": promo.id,
+        "code": promo.code,
+        "discount_type": promo.discount_type,
+        "discount_value": promo.discount_value,
+        "course_id": promo.course_id,
+        "course_title": course_title,
+        "max_uses": promo.max_uses or 0,
+        "used_count": promo.used_count or 0,
+        "is_active": bool(promo.is_active),
+        "valid_until": promo.valid_until.strftime("%Y-%m-%d") if promo.valid_until else "",
+        "note": promo.note or "",
+        "created_at": promo.created_at.strftime("%Y-%m-%d") if promo.created_at else "",
+    }
+
+
+@app.get("/api/v1/admin/promo-codes")
+async def admin_list_promos(db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_instructor)):
+    res = await db.execute(select(models.PromoCode).order_by(models.PromoCode.created_at.desc()))
+    promos = res.scalars().all()
+    course_ids = [p.course_id for p in promos if p.course_id]
+    titles: dict[int, str] = {}
+    if course_ids:
+        cres = await db.execute(select(models.Course).where(models.Course.id.in_(course_ids)))
+        titles = {c.id: c.title for c in cres.scalars().all()}
+    return [_promo_payload(p, titles.get(p.course_id) if p.course_id else "All courses") for p in promos]
+
+
+@app.post("/api/v1/admin/promo-codes")
+async def admin_create_promo(body: PromoCodeIn, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_instructor)):
+    code = _normalize_promo_code(body.code)
+    if len(code) < 3:
+        raise HTTPException(status_code=400, detail="Promo code must be at least 3 characters.")
+    dtype = (body.discount_type or "percent").lower().strip()
+    if dtype not in {"percent", "fixed"}:
+        raise HTTPException(status_code=400, detail="Discount type must be percent or fixed.")
+    value = int(body.discount_value or 0)
+    if value <= 0:
+        raise HTTPException(status_code=400, detail="Discount value must be greater than zero.")
+    if dtype == "percent" and value > 100:
+        raise HTTPException(status_code=400, detail="Percent discount cannot exceed 100.")
+    if body.course_id:
+        cres = await db.execute(select(models.Course).where(models.Course.id == body.course_id))
+        if not cres.scalars().first():
+            raise HTTPException(status_code=404, detail="Course not found.")
+    exists = await db.execute(select(models.PromoCode).where(models.PromoCode.code == code))
+    if exists.scalars().first():
+        raise HTTPException(status_code=400, detail="That promo code already exists.")
+    valid_until = None
+    if body.valid_until:
+        try:
+            valid_until = datetime.strptime(body.valid_until.strip()[:10], "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Use YYYY-MM-DD for the expiry date.")
+    promo = models.PromoCode(
+        code=code,
+        discount_type=dtype,
+        discount_value=value,
+        course_id=body.course_id,
+        max_uses=max(0, int(body.max_uses or 0)),
+        is_active=bool(body.is_active),
+        valid_until=valid_until,
+        note=(body.note or "").strip()[:255],
+    )
+    db.add(promo)
+    await db.commit()
+    await db.refresh(promo)
+    title = "All courses"
+    if promo.course_id:
+        cres = await db.execute(select(models.Course).where(models.Course.id == promo.course_id))
+        course = cres.scalars().first()
+        title = course.title if course else title
+    return _promo_payload(promo, title)
+
+
+@app.patch("/api/v1/admin/promo-codes/{promo_id}")
+async def admin_update_promo(
+    promo_id: int,
+    body: PromoCodeIn,
+    db: AsyncSession = Depends(get_db),
+    current_user: models.User = Depends(require_instructor),
+):
+    res = await db.execute(select(models.PromoCode).where(models.PromoCode.id == promo_id))
+    promo = res.scalars().first()
+    if not promo:
+        raise HTTPException(status_code=404, detail="Promo code not found.")
+    code = _normalize_promo_code(body.code) or promo.code
+    dtype = (body.discount_type or promo.discount_type or "percent").lower().strip()
+    if dtype not in {"percent", "fixed"}:
+        raise HTTPException(status_code=400, detail="Discount type must be percent or fixed.")
+    value = int(body.discount_value if body.discount_value is not None else promo.discount_value or 0)
+    if value <= 0:
+        raise HTTPException(status_code=400, detail="Discount value must be greater than zero.")
+    if dtype == "percent" and value > 100:
+        raise HTTPException(status_code=400, detail="Percent discount cannot exceed 100.")
+    if body.course_id:
+        cres = await db.execute(select(models.Course).where(models.Course.id == body.course_id))
+        if not cres.scalars().first():
+            raise HTTPException(status_code=404, detail="Course not found.")
+    clash = await db.execute(
+        select(models.PromoCode).where(models.PromoCode.code == code, models.PromoCode.id != promo_id)
+    )
+    if clash.scalars().first():
+        raise HTTPException(status_code=400, detail="That promo code already exists.")
+    valid_until = promo.valid_until
+    if body.valid_until is not None:
+        if not body.valid_until.strip():
+            valid_until = None
+        else:
+            try:
+                valid_until = datetime.strptime(body.valid_until.strip()[:10], "%Y-%m-%d")
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Use YYYY-MM-DD for the expiry date.")
+    promo.code = code
+    promo.discount_type = dtype
+    promo.discount_value = value
+    promo.course_id = body.course_id
+    promo.max_uses = max(0, int(body.max_uses or 0))
+    promo.is_active = bool(body.is_active)
+    promo.valid_until = valid_until
+    promo.note = (body.note or "").strip()[:255]
+    await db.commit()
+    await db.refresh(promo)
+    title = "All courses"
+    if promo.course_id:
+        cres = await db.execute(select(models.Course).where(models.Course.id == promo.course_id))
+        course = cres.scalars().first()
+        title = course.title if course else title
+    return _promo_payload(promo, title)
+
+
+@app.delete("/api/v1/admin/promo-codes/{promo_id}")
+async def admin_delete_promo(promo_id: int, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_instructor)):
+    res = await db.execute(select(models.PromoCode).where(models.PromoCode.id == promo_id))
+    promo = res.scalars().first()
+    if not promo:
+        raise HTTPException(status_code=404, detail="Promo code not found.")
+    await db.execute(delete(models.PromoRedemption).where(models.PromoRedemption.promo_id == promo_id))
+    await db.delete(promo)
+    await db.commit()
+    return {"message": "Promo code deleted."}
+
+
+@app.post("/api/v1/promo/validate")
+async def validate_promo(body: PromoValidateIn, db: AsyncSession = Depends(get_db), current_user: models.User = Depends(require_student)):
+    res = await db.execute(select(models.Course).where(models.Course.id == body.course_id))
+    course = res.scalars().first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    original = int(course.price or 0)
+    promo = await _load_usable_promo(db, body.code, body.course_id, current_user.id, require_code=True)
+    final_price = _promo_final_price(original, promo)
+    return {
+        "code": promo.code,
+        "discount_type": promo.discount_type,
+        "discount_value": promo.discount_value,
+        "original_price": original,
+        "final_price": final_price,
+        "savings": max(0, original - final_price),
+        "message": f"Promo applied. Pay ₹{final_price} instead of ₹{original}.",
+    }
+
+
 @app.post("/api/v1/create-order")
 async def create_payment_order(
     data: CreateOrderRequest,
     db: AsyncSession = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
-    # Razorpay client is sync, use thread
-    if not client or not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
-        raise HTTPException(status_code=500, detail="Razorpay is not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET on the API service.")
-
     res = await db.execute(select(models.Course).where(models.Course.id == data.course_id))
     course = res.scalars().first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
-    amount_value = int(course.price or 0)
-    if amount_value <= 0:
+    original = int(course.price or 0)
+    if original <= 0:
         raise HTTPException(status_code=400, detail="Course amount must be greater than zero")
 
+    promo = await _load_usable_promo(db, data.promo_code, data.course_id, current_user.id)
+    final_price = _promo_final_price(original, promo) if promo else original
+    promo_code = promo.code if promo else ""
+
+    # 100% / full discount: unlock without Razorpay.
+    if final_price <= 0:
+        enroll_res = await db.execute(
+            select(models.Enrollment).where(
+                models.Enrollment.user_id == current_user.id,
+                models.Enrollment.course_id == data.course_id,
+            )
+        )
+        existing = enroll_res.scalars().first()
+        if existing:
+            existing.enrollment_type = "paid"
+            existing.expiry_date = None
+        else:
+            db.add(models.Enrollment(user_id=current_user.id, course_id=data.course_id, enrollment_type="paid", expiry_date=None))
+        if promo:
+            await _record_promo_redemption(db, promo, current_user.id, data.course_id, original, 0, "FREE_PROMO")
+        await db.commit()
+        return {
+            "free": True,
+            "amount": 0,
+            "currency": "INR",
+            "original_price": original,
+            "final_price": 0,
+            "promo_code": promo_code,
+            "message": "Promo unlocked this course at no charge.",
+        }
+
+    if not client or not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
+        raise HTTPException(status_code=500, detail="Razorpay is not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET on the API service.")
+
     order_data = {
-        "amount": amount_value * 100,
+        "amount": final_price * 100,
         "currency": "INR",
         "payment_capture": 1,
         "notes": {
             "course_id": str(data.course_id),
-            "user_id": str(current_user.id)
+            "user_id": str(current_user.id),
+            "original_price": str(original),
+            "final_price": str(final_price),
+            "promo_code": promo_code,
         }
     }
     last_error = None
     for attempt in range(2):
         try:
             order = await asyncio.to_thread(client.order.create, data=order_data)
-            # Return the public key that created this order so checkout never mismatches the API account.
             return {
                 "id": order.get("id"),
                 "amount": order.get("amount"),
                 "currency": order.get("currency") or "INR",
                 "status": order.get("status"),
                 "key_id": RAZORPAY_KEY_ID,
+                "free": False,
+                "original_price": original,
+                "final_price": final_price,
+                "promo_code": promo_code,
             }
         except Exception as e:
             last_error = e
@@ -2479,14 +2766,6 @@ async def verify_payment_and_unlock_course(
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Unable to fetch payment details: {str(e)}")
 
-    expected_amount = int(course.price or 0) * 100
-    paid_amount = int(payment.get("amount") or 0)
-    payment_status = str(payment.get("status") or "").lower()
-    if paid_amount != expected_amount:
-        raise HTTPException(status_code=400, detail="Payment amount mismatch")
-    if payment_status != "captured":
-        raise HTTPException(status_code=400, detail=f"Payment not captured (status: {payment_status or 'unknown'})")
-
     try:
         order = await asyncio.to_thread(client.order.fetch, payload.razorpay_order_id)
     except Exception:
@@ -2499,6 +2778,28 @@ async def verify_payment_and_unlock_course(
     if str(payment.get("order_id") or "") != payload.razorpay_order_id:
         raise HTTPException(status_code=400, detail="Payment does not match this order.")
 
+    # Prefer the discounted amount stored on the Razorpay order notes.
+    try:
+        expected_rupees = int(notes.get("final_price") if notes.get("final_price") not in (None, "") else (course.price or 0))
+    except (TypeError, ValueError):
+        expected_rupees = int(course.price or 0)
+    expected_amount = expected_rupees * 100
+    paid_amount = int(payment.get("amount") or 0)
+    payment_status = str(payment.get("status") or "").lower()
+    if paid_amount != expected_amount:
+        raise HTTPException(status_code=400, detail="Payment amount mismatch")
+    if payment_status != "captured":
+        raise HTTPException(status_code=400, detail=f"Payment not captured (status: {payment_status or 'unknown'})")
+
+    promo_code = notes.get("promo_code") or payload.promo_code or ""
+    promo = None
+    if promo_code:
+        try:
+            promo = await _load_usable_promo(db, str(promo_code), payload.course_id, current_user.id)
+        except HTTPException:
+            # Already redeemed in a race, or code removed after order — still honor a verified payment.
+            promo = None
+
     enroll_res = await db.execute(
         select(models.Enrollment).where(
             models.Enrollment.user_id == current_user.id,
@@ -2510,7 +2811,13 @@ async def verify_payment_and_unlock_course(
         if existing.enrollment_type != "paid":
             existing.enrollment_type = "paid"
             existing.expiry_date = None
-            await db.commit()
+        if promo:
+            try:
+                original = int(notes.get("original_price") or course.price or 0)
+            except (TypeError, ValueError):
+                original = int(course.price or 0)
+            await _record_promo_redemption(db, promo, current_user.id, payload.course_id, original, expected_rupees, payload.razorpay_order_id)
+        await db.commit()
         return {"message": "Payment verified. Course unlocked.", "status": "success"}
 
     new_enrollment = models.Enrollment(
@@ -2520,6 +2827,12 @@ async def verify_payment_and_unlock_course(
         expiry_date=None
     )
     db.add(new_enrollment)
+    if promo:
+        try:
+            original = int(notes.get("original_price") or course.price or 0)
+        except (TypeError, ValueError):
+            original = int(course.price or 0)
+        await _record_promo_redemption(db, promo, current_user.id, payload.course_id, original, expected_rupees, payload.razorpay_order_id)
     await db.commit()
     return {"message": "Payment verified. Course unlocked.", "status": "success"}
 

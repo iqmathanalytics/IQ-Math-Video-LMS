@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, BookOpen, UserPlus, PlusCircle, LogOut,
-  ChevronRight, Code, Menu, Settings, Users, FolderOpen, MessageSquare, Award, PlayCircle, Search
+  ChevronRight, Code, Menu, Settings, Users, FolderOpen, MessageSquare, Award, PlayCircle, Search, Tag
 } from "lucide-react";
 import BrandLogo from "./components/BrandLogo";
 import BackButton from "./components/BackButton";
@@ -47,6 +47,7 @@ const DashboardLayout = () => {
         { label: "Students", path: "/dashboard/students", icon: <Users size={20} /> },
         { label: "Admit students", path: "/dashboard/add-admits", icon: <UserPlus size={20} /> },
         { label: "Certificates", path: "/dashboard/certificates", icon: <Award size={20} /> },
+        { label: "Promo codes", path: "/dashboard/promo-codes", icon: <Tag size={20} /> },
         { label: "Messages", path: "/dashboard/messages", icon: <MessageSquare size={20} /> },
         { label: "Programs", path: "/dashboard/programs", icon: <Award size={20} /> },
       ],
