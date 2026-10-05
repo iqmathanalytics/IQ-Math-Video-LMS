@@ -21,38 +21,6 @@ export const TOPICS: Array<Topic | "All"> = ["All", "AI", "Web", "Cloud", "Data"
 
 export const COURSES: PublicCourse[] = [
   {
-    slug: "neural-networks-from-scratch",
-    title: "Neural networks, explained from the pixels up",
-    topic: "AI",
-    level: "Intermediate",
-    duration: "19 min",
-    language: "English",
-    rating: "4.9",
-    blurb: "A visual lesson on how a network turns pixels into a digit prediction, and why the weights have to be learned.",
-    outcomes: ["Read a small network diagram", "Explain weights, bias and activation", "Know what to practise next in code"],
-    youtubeId: "aircAruvnKk",
-    creatorName: "Grant Sanderson",
-    channelName: "3Blue1Brown",
-    channelUrl: "https://www.youtube.com/@3blue1brown",
-    sourceUrl: "https://www.youtube.com/watch?v=aircAruvnKk",
-  },
-  {
-    slug: "python-for-beginners",
-    title: "Python for people who want to build, not memorise syntax",
-    topic: "Career",
-    level: "Beginner",
-    duration: "4 hr",
-    language: "English",
-    rating: "4.8",
-    blurb: "A full beginner course from freeCodeCamp: install Python, write programs, and leave with something you ran yourself.",
-    outcomes: ["Set up a Python environment", "Write functions and control flow", "Ship a small program"],
-    youtubeId: "rfscVS0vtbw",
-    creatorName: "freeCodeCamp.org",
-    channelName: "freeCodeCamp.org",
-    channelUrl: "https://www.youtube.com/@freecodecamp",
-    sourceUrl: "https://www.youtube.com/watch?v=rfscVS0vtbw",
-  },
-  {
     slug: "web-foundations",
     title: "Web foundations for product teams",
     topic: "Web",
@@ -118,7 +86,7 @@ export const PATHS = [
   {
     slug: "ai-builder",
     title: "AI builder",
-    steps: ["Neural networks, explained", "Python practice", "A small model you can show"],
+    steps: ["Read a small model diagram", "Python practice", "A small model you can show"],
   },
   {
     slug: "web-product",
